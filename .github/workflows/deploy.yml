@@ -19,15 +19,25 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
         with:
           node-version: 22
           cache: npm
       - run: npm ci
       - run: npm test
       - run: npm run build
+      # Pages の公開方法が「ブランチから公開」になっていると、ビルド前のファイルが公開されて
+      # 真っ白な画面になる。「GitHub Actions から公開」に切り替える
+      - name: Pages の公開方法を GitHub Actions にする
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh api -X PUT "repos/${{ github.repository }}/pages" -f build_type=workflow \
+            || echo "::warning::Pages の公開方法を自動で切り替えられませんでした。Settings → Pages → Source を GitHub Actions にしてください。"
       - uses: actions/configure-pages@v5
+        with:
+          enablement: true
       - uses: actions/upload-pages-artifact@v3
         with:
           path: dist
