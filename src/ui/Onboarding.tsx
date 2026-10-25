@@ -7,6 +7,7 @@ import { NumberField, Sheet, TextField } from './controls';
 import { fmtH, fmtYen } from './format';
 import { Icon } from './Icon';
 import { CAT_COLOR } from './viz';
+import { FixedCostEditor } from './FixedCostEditor';
 
 /** はじめての設定。3ステップで「現在の計画」の時間とお金を入力する */
 export function OnboardingSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
@@ -112,7 +113,7 @@ export function OnboardingSheet({ open, onClose }: { open: boolean; onClose: () 
         <div className="stack-m">
           <p className="sheet-lead">手取りの月収と、毎月のおおよその支出を入れてください。</p>
           <NumberField label="月の手取り収入" value={fin.monthlyIncome} onChange={(v) => setFin({ ...fin, monthlyIncome: v })} min={0} max={1e10} step={1000} unit="円/月" slider={{ min: 0, max: 1000000, step: 5000 }} />
-          <NumberField label="固定費（家賃・通信など）" value={fin.fixedCosts} onChange={(v) => setFin({ ...fin, fixedCosts: v })} min={0} max={1e10} step={1000} unit="円/月" slider={{ min: 0, max: 500000, step: 1000 }} />
+          <FixedCostEditor fin={fin} onChange={(p) => setFin({ ...fin, ...p })} />
           <NumberField label="変動費（食費・日用品など）" value={fin.variableCosts} onChange={(v) => setFin({ ...fin, variableCosts: v })} min={0} max={1e10} step={1000} unit="円/月" slider={{ min: 0, max: 500000, step: 1000 }} />
           <NumberField label="毎月の貯金額" value={fin.monthlySavings} onChange={(v) => setFin({ ...fin, monthlySavings: v })} min={0} max={1e10} step={1000} unit="円/月" slider={{ min: 0, max: 300000, step: 1000 }} />
           <NumberField label="現在の貯金額" value={fin.currentSavings} onChange={(v) => setFin({ ...fin, currentSavings: v })} min={0} max={1e11} step={10000} unit="円" slider={false} />

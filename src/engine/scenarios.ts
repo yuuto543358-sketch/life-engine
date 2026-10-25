@@ -1,6 +1,6 @@
 import { TIME_CATEGORY_KEYS, type ActualRecord, type Goal, type Scenario } from '../data/types';
 import { calculateGoalFeasibility } from './goals';
-import { projectSavings } from './money';
+import { fixedTotal, projectSavings } from './money';
 import { TIME_LABELS, TIME_SOURCE_LABELS } from './labels';
 import { round } from './units';
 
@@ -59,7 +59,7 @@ export function diffScenarios(base: Scenario, target: Scenario, goals: Goal[]): 
 
   const moneyFields: [keyof Scenario['finance'], string, ChangeUnit][] = [
     ['monthlyIncome', '手取り収入', '円/月'],
-    ['fixedCosts', '固定費', '円/月'],
+    ['fixedCosts', '固定費（合計）', '円/月'],
     ['variableCosts', '変動費', '円/月'],
     ['monthlySavings', '毎月の貯金額', '円/月'],
     ['currentSavings', '現在の貯金額', '円'],
@@ -68,9 +68,20 @@ export function diffScenarios(base: Scenario, target: Scenario, goals: Goal[]): 
     ['annualReturnRate', '想定年利', '%'],
   ];
   for (const [field, label, unit] of moneyFields) {
-    const a = base.finance[field];
-    const b = target.finance[field];
+    const a = field === 'fixedCosts' ? fixedTotal(base.finance) : base.finance[field];
+    const b = field === 'fixedCosts' ? fixedTotal(target.finance) : target.finance[field];
     if (a !== b) changes.push({ group: 'money', label, from: a as string | number, to: b as string | number, unit });
+  }
+  // 固定費の内訳（同じIDの項目どうしを比べる）
+  const fa = base.finance.fixedItems ?? [];
+  const fb = target.finance.fixedItems ?? [];
+  for (const item of fb) {
+    const before = fa.find((x) => x.id === item.id);
+    if (!before) changes.push({ group: 'money', label: `固定費・${item.label}`, from: '項目なし', to: item.amount, unit: '円/月' });
+    else if (before.amount !== item.amount) changes.push({ group: 'money', label: `固定費・${item.label}`, from: before.amount, to: item.amount, unit: '円/月' });
+  }
+  for (const item of fa) {
+    if (!fb.some((x) => x.id === item.id)) changes.push({ group: 'money', label: `固定費・${item.label}`, from: item.amount, to: '項目なし', unit: '円/月' });
   }
   const sig = (s: Scenario) =>
     s.finance.oneOffs.map((o) => `${o.label}|${o.type}|${o.amount}|${o.month}|${o.repeatYearly}`).sort().join(';');

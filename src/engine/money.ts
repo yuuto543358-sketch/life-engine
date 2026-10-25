@@ -32,6 +32,12 @@ function money(v: unknown): number {
   return n < 0 ? 0 : n;
 }
 
+/** 固定費の合計（円/月）。内訳があれば内訳の合計、なければ fixedCosts */
+export function fixedTotal(fin: Pick<FinancialProfile, 'fixedCosts' | 'fixedItems'>): number {
+  if (fin?.fixedItems && fin.fixedItems.length > 0) return fin.fixedItems.reduce((s, i) => s + money(i.amount), 0);
+  return money(fin?.fixedCosts);
+}
+
 /** 指定月に発生する臨時収支の合計（円、収入は正・支出は負） */
 export function oneOffNetForMonth(items: OneOffItem[], ym: string): number {
   const idx = monthIndex(ym);
@@ -54,7 +60,7 @@ export function oneOffNetForMonth(items: OneOffItem[], ym: string): number {
  */
 export function calculateMonthlyBalance(fin: FinancialProfile, today: string): MonthlyBalanceResult {
   const income = money(fin?.monthlyIncome);
-  const fixedCosts = money(fin?.fixedCosts);
+  const fixedCosts = fixedTotal(fin);
   const variableCosts = money(fin?.variableCosts);
   const plannedSavings = money(fin?.monthlySavings);
   const surplus = income - fixedCosts - variableCosts;

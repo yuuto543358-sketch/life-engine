@@ -47,11 +47,25 @@ export interface OneOffItem {
   repeatYearly: boolean;
 }
 
+/** 固定費の内訳の1項目 */
+export interface FixedCostItem {
+  id: string;
+  /** 項目名（例: 家賃） */
+  label: string;
+  /** 金額（円/月） */
+  amount: number;
+}
+
 export interface FinancialProfile {
   /** 月の手取り収入（円/月） */
   monthlyIncome: number;
-  /** 固定費（円/月）家賃・通信費・保険など */
+  /**
+   * 固定費の合計（円/月）。内訳（fixedItems）がある場合は常に内訳の合計と同じ値にする。
+   * 計算では fixedTotal() を使い、内訳を優先する。
+   */
   fixedCosts: number;
+  /** 固定費の内訳。未設定（古いデータ）の場合は fixedCosts をそのまま使う */
+  fixedItems?: FixedCostItem[];
   /** 変動費（円/月）食費・日用品・交際費など */
   variableCosts: number;
   /** 毎月の貯金額（円/月）。収支の余りから貯金に回す予定額 */

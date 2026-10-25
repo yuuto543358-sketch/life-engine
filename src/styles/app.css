@@ -2443,3 +2443,78 @@ button.domain-tr:active {
   top: calc(env(safe-area-inset-top) + 12px);
   bottom: auto;
 }
+
+/* 固定費の内訳 */
+.fixed-editor {
+  display: grid;
+  gap: 12px;
+  padding: 16px;
+  border-radius: var(--radius-m);
+  background: var(--surface);
+  box-shadow: 0 0 0 1px var(--ring);
+}
+.fixed-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+}
+.fixed-total {
+  font-size: var(--fs-xl);
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  line-height: 1.3;
+}
+.fixed-bar {
+  display: flex;
+  gap: 2px;
+  height: 8px;
+  border-radius: 4px;
+  overflow: hidden;
+}
+.fixed-bar span {
+  height: 100%;
+  transition: width calc(var(--dur) * 1.3) var(--ease);
+}
+.fixed-list {
+  display: grid;
+}
+.fixed-item {
+  padding: 10px 0 4px;
+  border-top: 1px solid var(--line);
+}
+.fixed-item .field {
+  grid-template-columns: 1fr auto;
+  column-gap: 4px;
+  row-gap: 4px;
+}
+.fixed-item .field-top,
+.fixed-item .field-error,
+.fixed-item .field-hint {
+  grid-column: 1 / -1;
+}
+.fixed-item .field-input {
+  width: 6.5em;
+}
+.fixed-label {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.fixed-share {
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  color: var(--ink-3);
+}
+.fixed-edit {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 36px;
+  border-radius: 10px;
+  color: var(--ink-3);
+}
+.fixed-edit:active {
+  background: var(--surface-2);
+}

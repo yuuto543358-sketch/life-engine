@@ -8,6 +8,7 @@ import {
   type TimeCategoryKey,
 } from '../data/types';
 import { calculateWeeklyTimeBudget } from './time';
+import { fixedTotal } from './money';
 import {
   addDays,
   addMonths,
@@ -160,7 +161,7 @@ export function calculatePlanDeviation(
   const moneyRows = (['fixed', 'variable'] as const).map((key) => {
     const recs = inside.filter((r) => r.type === 'expense' && r.expenseCategory === key);
     const actual = recs.reduce((s, r) => s + (r.type === 'expense' ? Math.max(0, num(r.amount)) : 0), 0);
-    const monthly = key === 'fixed' ? scenario.finance.fixedCosts : scenario.finance.variableCosts;
+    const monthly = key === 'fixed' ? fixedTotal(scenario.finance) : scenario.finance.variableCosts;
     return row(key, monthlyToPeriod(Math.max(0, num(monthly)), period.kind), actual, recs.length);
   });
 

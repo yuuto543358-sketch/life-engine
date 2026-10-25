@@ -119,3 +119,28 @@ describe('サンプルデータ', () => {
     expect(s.time.items.sleep.hoursPerDay).toBe(7);
   });
 });
+
+describe('固定費の内訳のバックアップ', () => {
+  it('内訳は復元され、合計は内訳から計算し直す', () => {
+    const b = createBackup(sampleData(), NOW);
+    b.data.scenarios[0].finance.fixedCosts = 1; // 食い違った合計
+    const r = parseBackup(JSON.stringify(b));
+    expect(r.ok).toBe(true);
+    if (r.ok) {
+      expect(r.data.scenarios[0].finance.fixedItems).toHaveLength(8);
+      expect(r.data.scenarios[0].finance.fixedCosts).toBe(110000);
+    }
+  });
+  it('内訳のない古いバックアップもそのまま読み込める', () => {
+    const b = createBackup(sampleData(), NOW);
+    delete b.data.scenarios[0].finance.fixedItems;
+    const r = parseBackup(JSON.stringify(b));
+    expect(r.ok && r.data.scenarios[0].finance.fixedItems).toBe(undefined);
+    expect(r.ok && r.data.scenarios[0].finance.fixedCosts).toBe(110000);
+  });
+  it('内訳の金額が不正なら読み込まない', () => {
+    const b = createBackup(sampleData(), NOW);
+    b.data.scenarios[0].finance.fixedItems![0].amount = -1;
+    expect(parseBackup(JSON.stringify(b)).ok).toBe(false);
+  });
+});

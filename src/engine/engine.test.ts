@@ -8,6 +8,7 @@ import {
   calculatePlanDeviation,
   calculateTaskAccuracy,
   calculateWeeklyTimeBudget,
+  fixedTotal,
   cloneScenario,
   compareScenarios,
   diffScenarios,
@@ -433,5 +434,49 @@ describe('傾向の要約', () => {
     const t = summarizeTrend([pt(0, 0), pt(0, 0), pt(0, 0), pt(6, 1), pt(8, 1), pt(10, 1), pt(9, 1), pt(12, 1)]);
     expect(t.sufficient).toBe(false);
     expect(t.changePct).toBeNull();
+  });
+});
+
+describe('固定費の内訳', () => {
+  it('内訳があれば内訳の合計を固定費として計算する', () => {
+    const fin = finance({
+      monthlyIncome: 300000,
+      fixedCosts: 999999, // 内訳がある場合は使わない
+      fixedItems: [
+        { id: 'a', label: '家賃', amount: 70000 },
+        { id: 'b', label: '通信費', amount: 8000 },
+        { id: 'c', label: '保険', amount: -500 }, // 負数は 0 として扱う
+      ],
+    });
+    expect(fixedTotal(fin)).toBe(78000);
+    expect(calculateMonthlyBalance(fin, TODAY)).toMatchObject({ fixedCosts: 78000, surplus: 222000 });
+  });
+
+  it('内訳がない古いデータは合計額をそのまま使う', () => {
+    expect(fixedTotal(finance({ fixedCosts: 50000 }))).toBe(50000);
+    expect(fixedTotal(finance({ fixedCosts: 50000, fixedItems: [] }))).toBe(50000);
+  });
+
+  it('シナリオの比較で、固定費の項目ごとの変更を示す', () => {
+    const base = scenarioWith((s) => {
+      s.finance.fixedItems = [
+        { id: 'rent', label: '家賃', amount: 70000 },
+        { id: 'phone', label: '通信費', amount: 8000 },
+      ];
+    });
+    const alt = cloneScenario(base, { id: 'alt', name: '引っ越し', now: NOW });
+    alt.finance.fixedItems![0].amount = 55000;
+    alt.finance.fixedItems!.push({ id: 'park', label: '駐車場代', amount: 10000 });
+    expect(base.finance.fixedItems![0].amount).toBe(70000); // 複製元は変わらない
+    const labels = diffScenarios(base, alt, []).map((c) => c.label);
+    expect(labels).toEqual(['固定費（合計）', '固定費・家賃', '固定費・駐車場代']);
+  });
+
+  it('計画と実績の差では、内訳の合計を固定費の計画値にする', () => {
+    const s = scenarioWith((s) => {
+      s.finance.fixedItems = [{ id: 'rent', label: '家賃', amount: 60000 }];
+    });
+    const rec: ActualRecord[] = [{ id: 'x', type: 'expense', date: TODAY, expenseCategory: 'fixed', amount: 60000, goalId: null, memo: '', createdAt: NOW }];
+    expect(calculatePlanDeviation(rec, s, [], periodFor('month', TODAY)).money.find((r) => r.key === 'fixed')).toMatchObject({ planned: 60000, actual: 60000, diff: 0 });
   });
 });

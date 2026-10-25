@@ -189,6 +189,17 @@ export function parseBackup(text: string): ImportResult {
       const f = emptyFinance();
       f.monthlyIncome = r.numIn(o.monthlyIncome, `${w}.monthlyIncome`, 0, MONEY_MAX);
       f.fixedCosts = r.numIn(o.fixedCosts, `${w}.fixedCosts`, 0, MONEY_MAX);
+      if (o.fixedItems === undefined) {
+        delete f.fixedItems; // 内訳のない古い形式。合計額をそのまま使う
+      } else {
+        f.fixedItems = r.arr(o.fixedItems, `${w}.fixedItems`).map((x, i) => {
+          const ww = `${w}.fixedItems[${i}]`;
+          const it = r.obj(x, ww);
+          return { id: r.str(it.id, `${ww}.id`), label: r.str(it.label, `${ww}.label`), amount: r.numIn(it.amount, `${ww}.amount`, 0, MONEY_MAX) };
+        });
+        // 合計は内訳から計算し直して、食い違いを防ぐ
+        if (f.fixedItems.length > 0) f.fixedCosts = f.fixedItems.reduce((s, it) => s + it.amount, 0);
+      }
       f.variableCosts = r.numIn(o.variableCosts, `${w}.variableCosts`, 0, MONEY_MAX);
       f.monthlySavings = r.numIn(o.monthlySavings, `${w}.monthlySavings`, 0, MONEY_MAX);
       f.currentSavings = r.numIn(o.currentSavings, `${w}.currentSavings`, -MONEY_MAX, MONEY_MAX);

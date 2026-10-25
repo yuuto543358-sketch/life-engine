@@ -74,6 +74,16 @@ export function buildSample(today: string, now: string): SampleBundle {
   const finance: FinancialProfile = {
     monthlyIncome: 280000,
     fixedCosts: 110000,
+    fixedItems: [
+      { id: 'fx-rent', label: '家賃・住宅ローン', amount: 68000 },
+      { id: 'fx-utilities', label: '水道光熱費', amount: 12000 },
+      { id: 'fx-phone', label: '通信費（スマホ・ネット）', amount: 8000 },
+      { id: 'fx-insurance', label: '保険', amount: 7000 },
+      { id: 'fx-subscription', label: 'サブスク', amount: 3000 },
+      { id: 'fx-transport', label: '交通費（定期・車など）', amount: 0 },
+      { id: 'fx-loan', label: 'ローン返済', amount: 0 },
+      { id: 'fx-other', label: 'その他の固定費', amount: 12000 },
+    ],
     variableCosts: 90000,
     monthlySavings: 50000,
     currentSavings: 850000,

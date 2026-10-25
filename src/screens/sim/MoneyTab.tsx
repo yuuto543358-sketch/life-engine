@@ -6,6 +6,7 @@ import { AnimatedNumber, ConfirmSheet, Disclosure, NumberField, Segmented, Sheet
 import { fmtMonth, fmtMonths, fmtYen, splitYen } from '../../ui/format';
 import { Icon } from '../../ui/Icon';
 import { useScenarioModel } from '../../ui/model';
+import { FixedCostEditor } from '../../ui/FixedCostEditor';
 import { FlowBar, Legend, ProjectionChart } from '../../ui/viz';
 import type { EditScenario } from '../Simulator';
 
@@ -94,7 +95,7 @@ export function MoneyTab({ scenario, edit }: { scenario: Scenario; edit: EditSce
 
       <section className="stack-m" aria-label="毎月の収支">
         <NumberField label="月の手取り収入" value={fin.monthlyIncome} onChange={(v) => setFin({ monthlyIncome: v })} min={0} max={1e10} step={1000} unit="円/月" slider={{ min: 0, max: 1000000, step: 5000 }} color={MONEY_COLORS.savings} />
-        <NumberField label="固定費" hint="家賃・通信費・保険・サブスクなど毎月ほぼ同じ支出" value={fin.fixedCosts} onChange={(v) => setFin({ fixedCosts: v })} min={0} max={1e10} step={1000} unit="円/月" slider={{ min: 0, max: 500000, step: 1000 }} color={MONEY_COLORS.fixed} />
+        <FixedCostEditor fin={fin} onChange={setFin} color={MONEY_COLORS.fixed} compactMoney={compact} />
         <NumberField label="変動費" hint="食費・日用品・交際費など月によって変わる支出" value={fin.variableCosts} onChange={(v) => setFin({ variableCosts: v })} min={0} max={1e10} step={1000} unit="円/月" slider={{ min: 0, max: 500000, step: 1000 }} color={MONEY_COLORS.variable} />
         <NumberField label="毎月の貯金額" hint="月間収支のうち、貯金に回す予定の額" value={fin.monthlySavings} onChange={(v) => setFin({ monthlySavings: v })} min={0} max={1e10} step={1000} unit="円/月" slider={{ min: 0, max: Math.max(300000, Math.ceil(Math.max(0, m.surplus) / 10000) * 10000), step: 1000 }} color={MONEY_COLORS.savings} />
       </section>
