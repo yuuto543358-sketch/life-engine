@@ -2607,6 +2607,78 @@ button.domain-tr:active {
   font-size: var(--fs-xs);
   color: var(--ink-3);
 }
+.need-split {
+  display: flex;
+  align-items: flex-end;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin: 2px 0 4px;
+}
+.need-sub-label {
+  font-size: var(--fs-xs);
+  color: var(--ink-3);
+}
+.need-plus {
+  font-size: var(--fs-l);
+  color: var(--ink-3);
+  padding-bottom: 4px;
+}
+.bonus-plan {
+  display: grid;
+  gap: 8px;
+  padding: 12px 14px;
+  border-radius: var(--radius-m);
+  background: var(--accent-wash);
+}
+.bonus-plan-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 700;
+  font-size: var(--fs-s);
+}
+.bonus-plan-title svg {
+  color: var(--accent);
+}
+.money-goal-split {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  font-size: var(--fs-xs);
+}
+.split-chip {
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--surface-2);
+  color: var(--ink-2);
+  white-space: nowrap;
+}
+.split-bonus {
+  background: var(--accent-wash);
+  color: var(--warn-text);
+}
+.split-plus {
+  color: var(--ink-3);
+}
+.bonus-schedule {
+  display: grid;
+  gap: 6px;
+  font-size: var(--fs-s);
+}
+.bonus-schedule li {
+  display: grid;
+  gap: 1px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--line);
+}
+.bonus-schedule li:last-child {
+  border-bottom: 0;
+}
+.bonus-what {
+  font-size: var(--fs-xs);
+  color: var(--ink-2);
+}
 .auto-empty {
   display: grid;
   gap: 10px;

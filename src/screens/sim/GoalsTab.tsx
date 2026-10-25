@@ -205,9 +205,12 @@ function GoalCard({ goal, plan, result: r, open, onToggle, scenario, edit }: { g
                         : '目標日を設定してください'
                       : r.monthlyShort > 0
                         ? `毎月${fmtYen(r.monthlyNeed ?? 0, true)}必要・月${fmtYen(r.monthlyShort, true)}不足`
-                        : `毎月${fmtYen(r.monthlyNeed ?? 0, true)}を貯金から確保`}
+                        : r.fromBonus > 0 && (r.monthlyNeed ?? 0) === 0
+                          ? 'ボーナスだけで間に合う'
+                          : `毎月${fmtYen(r.monthlyNeed ?? 0, true)}を貯金から確保`}
                   </StatusTag>
                 )}
+                {r.isMoney && !r.budgetUncomputable && r.fromBonus > 0 && <StatusTag tone="neutral">ボーナスで{fmtYen(r.fromBonus, true)}（{r.bonusTimes}回）</StatusTag>}
                 {dl && dl.text !== '完了' && <StatusTag tone={dl.tone}>{dl.text}</StatusTag>}
               </>
             )}
@@ -234,7 +237,8 @@ function GoalCard({ goal, plan, result: r, open, onToggle, scenario, edit }: { g
                 <dt>お金</dt>
                 <dd>
                   目標 {fmtYen(r.budget, compact)} − 貯まっている {fmtYen(r.saved, compact)} = あと {fmtYen(r.remainingBudget, compact)}
-                  {r.monthsLeft && r.monthlyNeed ? ` ÷ ${r.monthsLeft}か月 = 毎月${fmtYen(r.monthlyNeed, compact)}` : ''}
+                  {r.fromBonus > 0 ? `（うちボーナスで ${fmtYen(r.fromBonus, compact)}・${r.bonusTimes}回）` : ''}
+                  {r.monthsLeft && r.monthlyNeed !== null ? ` → 残り ${fmtYen(r.remainingBudget - r.fromBonus, compact)} ÷ ${r.monthsLeft}か月 = 毎月${fmtYen(r.monthlyNeed, compact)}` : ''}
                 </dd>
               </>
             )}
@@ -259,7 +263,7 @@ function GoalCard({ goal, plan, result: r, open, onToggle, scenario, edit }: { g
 
           <h3 className="subhead">「{scenario.name}」での計画</h3>
           <Toggle label="この目標を計画に含める" checked={plan.included} onChange={(included) => setPlan({ included })} />
-          <GoalPlanFields plan={plan} onChange={setPlan} kind={goal.kind} saved={goal.savedAmount ?? 0} />
+          <GoalPlanFields plan={plan} onChange={setPlan} kind={goal.kind} saved={goal.savedAmount ?? 0} goal={goal} scenarioId={scenario.id} />
 
           <h3 className="subhead">
             目標の情報 <span className="subhead-note">全シナリオ共通{otherScenarios > 0 ? `・ほか${otherScenarios}件のシナリオにも反映` : ''}</span>

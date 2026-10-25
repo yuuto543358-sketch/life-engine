@@ -286,7 +286,7 @@ function ActivePlans() {
                 </div>
                 <Meter value={r.progress} label={`${g.name}の進捗`} color={r.isMoney ? 'var(--c-commute)' : 'var(--accent)'} />
                 <p className="plan-meta num">
-                  {r.isMoney ? `${fmtYen(r.saved, true)} / ${fmtYen(r.budget, true)}${r.monthlyNeed ? ` · 毎月${fmtYen(r.monthlyNeed, true)}` : ''}` : `進捗 ${Math.round(r.progress)}%${r.weeklyHours ? ` · 週${fmtH(r.weeklyHours)}時間` : ''}`}
+                  {r.isMoney ? `${fmtYen(r.saved, true)} / ${fmtYen(r.budget, true)}${r.fromBonus > 0 ? ` · ボーナス${fmtYen(r.fromBonus, true)}` : ''}${r.monthlyNeed ? ` · 毎月${fmtYen(r.monthlyNeed, true)}` : ''}` : `進捗 ${Math.round(r.progress)}%${r.weeklyHours ? ` · 週${fmtH(r.weeklyHours)}時間` : ''}`}
                   {r.deadline ? ` · ${fmtDate(r.deadline)}まで` : ''}
                 </p>
               </li>

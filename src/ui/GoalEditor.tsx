@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { newId, nowIso, useStore } from '../data/store';
 import { defaultGoalPlan } from '../data/defaults';
 import { TIME_CATEGORY_KEYS, type AppData, type ChronicleEntry, type Goal, type GoalKind, type GoalPlan, type TimeSource } from '../data/types';
-import { TIME_SOURCE_LABELS, calculateMoneyGoalNeed, isValidDate } from '../engine';
+import { TIME_SOURCE_LABELS, bonusSavingsRate, calculateMoneyGoalNeed, isBonusItem, isValidDate, moneyGoalNeeds } from '../engine';
 import { fmtMonth, fmtYen } from './format';
 import { Disclosure, NumberField, Segmented, SelectField, Sheet, StatusTag, Stepper, TextField, Toggle } from './controls';
 
@@ -11,14 +11,61 @@ export const TIME_SOURCE_OPTIONS: { value: TimeSource; label: string }[] = [
   ...TIME_CATEGORY_KEYS.filter((k) => !['sleep', 'commute'].includes(k)).map((k) => ({ value: k as TimeSource, label: `${TIME_SOURCE_LABELS[k]}の時間から` })),
 ];
 
-/** お金の目標の「毎月いくら貯める必要があるか」をその場で表示する */
-export function MoneyNeedPreview({ target, deadline, saved }: { target: number; deadline: string; saved: number }) {
-  const { today, data } = useStore();
+/**
+ * お金の目標の「毎月いくら貯める必要があるか」をその場で表示する。
+ * ボーナスを登録していれば、ほかの目標との優先順位も考えて「ボーナスで貯める額」と「それ以外に毎月貯める額」に分ける。
+ */
+export function MoneyNeedPreview({ target, deadline, saved, goal, plan, scenarioId }: { target: number; deadline: string; saved: number; goal?: Goal; plan?: GoalPlan; scenarioId?: string }) {
+  const { today, data, current } = useStore();
   const compact = data.settings.compactMoney;
-  const n = calculateMoneyGoalNeed(target, deadline, saved, today);
+  let n = calculateMoneyGoalNeed(target, deadline, saved, today);
+  const scenario = data.scenarios.find((s) => s.id === scenarioId) ?? current;
+  const hasBonus = scenario.finance.oneOffs.some(isBonusItem) && bonusSavingsRate(scenario.finance) > 0;
+  if (goal && plan) {
+    const draft: Goal = { ...goal, kind: 'money', savedAmount: saved };
+    const goals = [...data.goals.filter((g) => g.id !== goal.id), draft];
+    const temp = { ...scenario, goalPlans: { ...scenario.goalPlans, [goal.id]: { ...plan, budget: target, deadline, included: true } } };
+    n = moneyGoalNeeds(temp, goals, today).get(goal.id) ?? n;
+  }
   return (
     <div className="need-preview" aria-live="polite">
-      {n.status === 'ok' && (
+      {n.status === 'ok' && n.fromBonus > 0 && (
+        <>
+          <p className="need-label">目標日までに貯める額の内訳</p>
+          <div className="need-split">
+            <div>
+              <p className="need-sub-label">ボーナスで</p>
+              <p className="need-value num">
+                {fmtYen(n.fromBonus, compact)}
+                <span className="unit">（{n.bonusUses.length}回）</span>
+              </p>
+            </div>
+            {(n.monthlyNeed ?? 0) > 0 ? (
+              <>
+                <span className="need-plus" aria-hidden="true">
+                  ＋
+                </span>
+                <div>
+                  <p className="need-sub-label">それ以外に毎月</p>
+                  <p className="need-value num">
+                    {fmtYen(n.monthlyNeed ?? 0)}
+                    <span className="unit">/月</span>
+                  </p>
+                </div>
+              </>
+            ) : (
+              <p className="need-sub-label">ボーナスだけで間に合います（毎月の積み立ては 0円）</p>
+            )}
+          </div>
+          <p className="need-formula num">
+            ボーナス: {n.bonusUses.map((u) => `${fmtMonth(u.month)} ${fmtYen(u.amount, compact)}`).join('・')}
+          </p>
+          <p className="need-formula num">
+            毎月: （{fmtYen(n.target, compact)} − 貯まっている {fmtYen(n.saved, compact)} − ボーナス {fmtYen(n.fromBonus, compact)}）÷ {n.months}か月（今月〜{fmtMonth(deadline.slice(0, 7))}）
+          </p>
+        </>
+      )}
+      {n.status === 'ok' && n.fromBonus === 0 && (
         <>
           <p className="need-label">目標日までに毎月貯める額</p>
           <p className="need-value num">
@@ -28,6 +75,10 @@ export function MoneyNeedPreview({ target, deadline, saved }: { target: number; 
           <p className="need-formula num">
             （{fmtYen(n.target, compact)} − 貯まっている {fmtYen(n.saved, compact)}）÷ {n.months}か月（今月〜{fmtMonth(deadline.slice(0, 7))}）
           </p>
+          {hasBonus && goal && (
+            <p className="need-formula">目標日までのボーナスは、優先順位が上の目標に使われています。この目標を先に貯めたいときは、優先順位を上げてください。</p>
+          )}
+          {!hasBonus && <p className="need-formula">ボーナスを「蓄え・お金」の臨時収入に登録すると、ボーナスで貯める分も計算します。</p>}
         </>
       )}
       {n.status === 'done' && <StatusTag tone="good">目標金額に達しています</StatusTag>}
@@ -39,7 +90,7 @@ export function MoneyNeedPreview({ target, deadline, saved }: { target: number; 
 }
 
 /** 目標の計画値（シナリオごと）の入力欄 */
-export function GoalPlanFields({ plan, onChange, kind = 'general', saved = 0 }: { plan: GoalPlan; onChange: (p: Partial<GoalPlan>) => void; kind?: GoalKind; saved?: number }) {
+export function GoalPlanFields({ plan, onChange, kind = 'general', saved = 0, goal, scenarioId }: { plan: GoalPlan; onChange: (p: Partial<GoalPlan>) => void; kind?: GoalKind; saved?: number; goal?: Goal; scenarioId?: string }) {
   const priority = (
     <div className="field">
       <span className="field-label">優先順位（1 が最優先）</span>
@@ -60,7 +111,7 @@ export function GoalPlanFields({ plan, onChange, kind = 'general', saved = 0 }: 
       <div className="stack-m">
         <NumberField label="目標金額" value={plan.budget} onChange={(budget) => onChange({ budget })} min={0} max={1e11} step={1000} unit="円" slider={{ min: 0, max: 5000000, step: 10000 }} color="var(--c-commute)" />
         <TextField label="目標日（いつまでに）" type="date" value={plan.deadline} onChange={(v) => onChange({ deadline: v === '' || isValidDate(v) ? v : plan.deadline })} />
-        <MoneyNeedPreview target={plan.budget} deadline={plan.deadline} saved={saved} />
+        <MoneyNeedPreview target={plan.budget} deadline={plan.deadline} saved={saved} goal={goal} plan={plan} scenarioId={scenarioId} />
         {priority}
         <Disclosure summary={plan.weeklyHours > 0 ? `時間も使う（週${plan.weeklyHours}時間）` : '時間も必要な場合'}>
           <div className="stack-m">{time}</div>
@@ -205,7 +256,7 @@ export function NewGoalSheet({ open, onClose, scenarioId, domainId, onCreated, i
         <GoalInfoFields goal={goal} onChange={(p) => setGoal({ ...goal, ...p })} target={plan.budget} />
         <div>
           <h3 className="subhead">「{scenarioName}」での計画</h3>
-          <GoalPlanFields plan={plan} onChange={(p) => setPlan({ ...plan, ...p })} kind={kind} saved={goal.savedAmount ?? 0} />
+          <GoalPlanFields plan={plan} onChange={(p) => setPlan({ ...plan, ...p })} kind={kind} saved={goal.savedAmount ?? 0} goal={goal} scenarioId={scenarioId} />
         </div>
       </div>
     </Sheet>

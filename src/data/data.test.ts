@@ -38,6 +38,18 @@ describe('バックアップ', () => {
     expect(r.warnings).toHaveLength(0);
   });
 
+  it('ボーナスの設定（貯金に回す割合・ボーナスとして使うか）も復元できる', () => {
+    const data = sampleData();
+    const cur = data.scenarios[0];
+    const finance = { ...cur.finance, bonusSavingsRate: 70, oneOffs: [{ id: 'b', label: '決算賞与', amount: 200000, type: 'income' as const, month: '2027-03', repeatYearly: false, bonus: true }] };
+    const withBonus = { ...data, scenarios: [{ ...cur, finance }, ...data.scenarios.slice(1)] };
+    const r = parseBackup(JSON.stringify(createBackup(withBonus, NOW)));
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.data.scenarios[0].finance.bonusSavingsRate).toBe(70);
+    expect(r.data.scenarios[0].finance.oneOffs[0]).toMatchObject({ bonus: true, repeatYearly: false });
+  });
+
   it('JSON でないファイルは受け付けない', () => {
     const r = parseBackup('not json');
     expect(r.ok).toBe(false);

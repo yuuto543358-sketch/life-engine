@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { newId, useStore } from '../../data/store';
 import { CURRENT_SCENARIO_ID, type FinancialProfile, type OneOffItem, type Scenario } from '../../data/types';
-import { addMonths, calculateAutoSavingsTarget, isValidMonth, projectSavings, resolveFinance, savingsTargetMode } from '../../engine';
+import { addMonths, bonusSavingsRate, calculateAutoSavingsTarget, isBonusItem, isValidMonth, projectSavings, resolveFinance, savingsTargetMode } from '../../engine';
 import { AnimatedNumber, ConfirmSheet, Disclosure, Meter, NumberField, Segmented, Sheet, TextField, Toggle, StatusTag } from '../../ui/controls';
 import { fmtMonth, fmtMonths, fmtYen, splitYen } from '../../ui/format';
 import { Icon } from '../../ui/Icon';
@@ -148,7 +148,16 @@ export function MoneyTab({ scenario, edit }: { scenario: Scenario; edit: EditSce
               <TextField label="目標達成期限（年月）" type="month" value={fin.targetMonth} onChange={(v) => setFin({ targetMonth: v === '' || isValidMonth(v) ? v : fin.targetMonth })} />
             </>
           ) : (
-            <AutoTargetPanel auto={auto} f={f} compact={compact} onAdd={() => setAddingGoal(true)} onApply={(total) => setFin(setSavingsTotal(fin, total))} />
+            <AutoTargetPanel
+              auto={auto}
+              f={f}
+              fin={fin}
+              compact={compact}
+              onAdd={() => setAddingGoal(true)}
+              onApply={(total) => setFin(setSavingsTotal(fin, total))}
+              onRate={(bonusSavingsRate) => setFin({ bonusSavingsRate })}
+              onAddBonus={() => setOoEdit({ id: newId('oo-'), label: 'ボーナス', amount: 0, type: 'income', month: today.slice(0, 7), repeatYearly: true, bonus: true })}
+            />
           )}
         </div>
         {p.target > 0 ? (
@@ -224,6 +233,7 @@ export function MoneyTab({ scenario, edit }: { scenario: Scenario; edit: EditSce
                       <span className="list-sub">
                         {fmtMonth(o.month)}
                         {o.repeatYearly ? '・毎年' : ''}
+                        {isBonusItem(o) ? '・ボーナスとして貯金の計算に使う' : ''}
                       </span>
                     </span>
                     <span className={`num list-value ${o.type === 'expense' ? 'is-neg' : ''}`}>{fmtYen(o.type === 'income' ? o.amount : -o.amount, compact, true)}</span>
@@ -260,7 +270,25 @@ export function MoneyTab({ scenario, edit }: { scenario: Scenario; edit: EditSce
   );
 }
 
-function AutoTargetPanel({ auto, f, compact, onAdd, onApply }: { auto: ReturnType<typeof calculateAutoSavingsTarget>; f: ReturnType<typeof useScenarioModel>['feasibility']; compact: boolean; onAdd: () => void; onApply: (total: number) => void }) {
+function AutoTargetPanel({
+  auto,
+  f,
+  fin,
+  compact,
+  onAdd,
+  onApply,
+  onRate,
+  onAddBonus,
+}: {
+  auto: ReturnType<typeof calculateAutoSavingsTarget>;
+  f: ReturnType<typeof useScenarioModel>['feasibility'];
+  fin: FinancialProfile;
+  compact: boolean;
+  onAdd: () => void;
+  onApply: (total: number) => void;
+  onRate: (rate: number) => void;
+  onAddBonus: () => void;
+}) {
   const m = f.money;
   if (auto.goals.length === 0) {
     return (
@@ -276,8 +304,39 @@ function AutoTargetPanel({ auto, f, compact, onAdd, onApply }: { auto: ReturnTyp
   const planned = m.plannedSavings;
   const short = Math.max(0, need - Math.max(0, m.effectiveSavings));
   const result = new Map(f.goals.map((g) => [g.goalId, g]));
+  const bonuses = fin.oneOffs.filter(isBonusItem);
   return (
     <div className="auto-target">
+      <div className="bonus-plan">
+        <p className="bonus-plan-title">
+          <Icon name="spark" size={16} /> ボーナスも見込んで計算
+        </p>
+        {bonuses.length === 0 ? (
+          <>
+            <p className="small muted">ボーナスを登録すると、「ボーナスで貯める額」と「それ以外に毎月貯める額」に分けて計算します。</p>
+            <button type="button" className="btn btn-small btn-ghost" onClick={onAddBonus}>
+              <Icon name="plus" size={16} /> ボーナスを登録
+            </button>
+          </>
+        ) : (
+          <>
+            <p className="small muted">
+              {bonuses.map((b) => `${b.label || 'ボーナス'}（${+b.month.slice(5)}月${b.repeatYearly ? '・毎年' : ''} ${fmtYen(b.amount, compact)}）`).join('、')}
+            </p>
+            <NumberField
+              label="ボーナスのうち貯金に回す割合"
+              value={bonusSavingsRate(fin)}
+              onChange={onRate}
+              min={0}
+              max={100}
+              step={5}
+              unit="%"
+              slider={{ min: 0, max: 100, step: 5 }}
+              hint="0% にすると、ボーナスを使わずに毎月の貯金だけで計算します。"
+            />
+          </>
+        )}
+      </div>
       <ul className="money-goals">
         {auto.goals.map(({ goal, plan, need: n }) => {
           const r = result.get(goal.id);
@@ -290,6 +349,19 @@ function AutoTargetPanel({ auto, f, compact, onAdd, onApply }: { auto: ReturnTyp
                 </span>
                 <span className="num money-goal-need">{n.monthlyNeed !== null ? `${fmtYen(n.monthlyNeed)}/月` : '—'}</span>
               </div>
+              {n.status === 'ok' && n.fromBonus > 0 && (
+                <p className="money-goal-split num">
+                  <span className="split-chip split-bonus">ボーナスで {fmtYen(n.fromBonus, compact)}（{n.bonusUses.length}回）</span>
+                  {(n.monthlyNeed ?? 0) > 0 ? (
+                    <>
+                      <span className="split-plus">＋</span>
+                      <span className="split-chip">毎月 {fmtYen(n.monthlyNeed ?? 0, compact)} × {n.months}か月</span>
+                    </>
+                  ) : (
+                    <span className="split-chip">ボーナスだけで間に合います</span>
+                  )}
+                </p>
+              )}
               <Meter value={n.saved} max={n.target || 1} label={`${goal.name}の貯まっている額`} color="var(--c-commute)" />
               <p className="money-goal-sub num">
                 {fmtYen(n.saved, compact)} / {fmtYen(n.target, compact)}
@@ -309,12 +381,20 @@ function AutoTargetPanel({ auto, f, compact, onAdd, onApply }: { auto: ReturnTyp
           <dd className="num">{fmtYen(auto.target, compact)}</dd>
           <dd className="stat-sub">{auto.month ? `いちばん遅い目標日 ${fmtMonth(auto.month)}` : '目標日 未設定'}</dd>
         </div>
+        {auto.fromBonus > 0 && (
+          <div>
+            <dt>ボーナスで貯める額</dt>
+            <dd className="num">{fmtYen(auto.fromBonus, compact)}</dd>
+            <dd className="stat-sub">ボーナスの {auto.bonusRate}% を目標日までに</dd>
+          </div>
+        )}
         <div>
-          <dt>毎月必要な貯金額</dt>
+          <dt>{auto.fromBonus > 0 ? 'ボーナス以外に毎月貯める額' : '毎月必要な貯金額'}</dt>
           <dd className={`num ${short > 0 ? 'is-bad' : ''}`}>{fmtYen(need)}/月</dd>
           <dd className="stat-sub">いまの毎月の貯金・積立 {fmtYen(planned)}</dd>
         </div>
       </dl>
+      {auto.fromBonus > 0 && <BonusSchedule auto={auto} compact={compact} />}
       {short > 0 ? (
         <div className="callout callout-warn">
           <Icon name="alert" size={18} />
@@ -337,8 +417,40 @@ function AutoTargetPanel({ auto, f, compact, onAdd, onApply }: { auto: ReturnTyp
           <p>いまの毎月の貯金で、すべてのお金の目標に間に合う計算です。</p>
         </div>
       ) : null}
-      <p className="fineprint">毎月必要な額 =（目標金額 − 貯まっている額）÷ 今月から目標日の月までの月数。目標ごとに計算して合計しています。お金の目標は「目標」タブで追加・編集できます。</p>
+      <p className="fineprint">
+        計算のしかた: まず、目標日までに入るボーナスのうち「貯金に回す割合」の分を、優先順位の高い目標から順に、早く入るボーナスから使います（同じボーナスを二重には数えません）。残りの額を、今月から目標日の月までの月数で割ったものが「毎月貯める額」です。今月に入るボーナスも数えます。お金の目標は「目標」タブで追加・編集できます。
+      </p>
     </div>
+  );
+}
+
+/** ボーナスごとの、目標への割り振り（いつ・いくら・どの目標に） */
+function BonusSchedule({ auto, compact }: { auto: ReturnType<typeof calculateAutoSavingsTarget>; compact: boolean }) {
+  const rows = new Map<string, { month: string; label: string; items: { name: string; amount: number }[] }>();
+  for (const { goal, need } of auto.goals) {
+    for (const u of need.bonusUses) {
+      const key = `${u.month}|${u.label}`;
+      const row = rows.get(key) ?? { month: u.month, label: u.label, items: [] };
+      row.items.push({ name: goal.name, amount: u.amount });
+      rows.set(key, row);
+    }
+  }
+  const list = [...rows.values()].sort((a, b) => a.month.localeCompare(b.month));
+  return (
+    <Disclosure summary={`ボーナスの使いみち（${list.length}回分）`}>
+      <ol className="bonus-schedule">
+        {list.map((r) => (
+          <li key={`${r.month}${r.label}`}>
+            <span className="bonus-when">
+              {fmtMonth(r.month)} <span className="muted">{r.label}</span>
+            </span>
+            <span className="bonus-what num">
+              {r.items.map((it) => `${it.name} ${fmtYen(it.amount, compact)}`).join('・')}
+            </span>
+          </li>
+        ))}
+      </ol>
+    </Disclosure>
   );
 }
 
@@ -416,6 +528,14 @@ function OneOffSheet({ item, onClose, onSave, onDelete, exists, defaultMonth }: 
           <NumberField label="金額" value={draft.amount} onChange={(amount) => setDraft({ ...draft, amount })} min={0} max={1e11} step={1000} unit="円" slider={false} hint={draft.amount <= 0 ? '1円以上を入力してください' : undefined} />
           <TextField label="発生する年月" type="month" value={draft.month} onChange={(month) => setDraft({ ...draft, month: month || defaultMonth })} />
           <Toggle label="毎年くり返す" hint="ボーナスなど、毎年同じ月に発生する場合" checked={draft.repeatYearly} onChange={(repeatYearly) => setDraft({ ...draft, repeatYearly })} />
+          {draft.type === 'income' && (
+            <Toggle
+              label="ボーナスとして、お金の目標の計算に使う"
+              hint="オンにすると、この収入の一部（貯金に回す割合の分）で目標のお金を貯める計算になります"
+              checked={isBonusItem(draft)}
+              onChange={(bonus) => setDraft({ ...draft, bonus })}
+            />
+          )}
         </div>
       </Sheet>
       <ConfirmSheet

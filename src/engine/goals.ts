@@ -1,7 +1,7 @@
 import type { ActualRecord, Goal, GoalPlan, Scenario, TimeSource } from '../data/types';
 import { calculateWeeklyTimeBudget, type WeeklyTimeBudgetResult } from './time';
 import { calculateMonthlyBalance, type MonthlyBalanceResult } from './money';
-import { calculateMoneyGoalNeed, isMoneyGoal } from './moneyGoals';
+import { isMoneyGoal, moneyGoalNeeds } from './moneyGoals';
 import { addDays, clamp, daysBetween, isValidDate, monthsUntilInclusive, num, round, DAYS_PER_WEEK } from './units';
 
 export type DeadlineStatus =
@@ -74,6 +74,9 @@ export interface GoalFeasibility {
   purpose: 'save' | 'buy' | null;
   /** すでに貯まっている額（円、お金の目標のみ） */
   saved: number;
+  /** お金の目標: ボーナスから貯める額（円）と回数 */
+  fromBonus: number;
+  bonusTimes: number;
   /** 進捗（%）。お金の目標は 貯まっている額 ÷ 目標金額 */
   progress: number;
 }
@@ -169,6 +172,7 @@ export function calculateGoalFeasibility(
   const savingsAvailableMonthly = Math.max(0, money.effectiveSavings);
   let savingsPool = savingsAvailableMonthly;
 
+  const moneyNeeds = moneyGoalNeeds(scenario, goals, today);
   const entries = orderGoals(
     goals
       .filter((g) => scenario.goalPlans[g.id]?.included)
@@ -177,7 +181,7 @@ export function calculateGoalFeasibility(
 
   const results: GoalFeasibility[] = entries.map(({ goal, plan }, order) => {
     const isMoney = isMoneyGoal(goal);
-    const need = isMoney ? calculateMoneyGoalNeed(plan.budget, plan.deadline, goal.savedAmount ?? 0, today) : null;
+    const need = isMoney ? moneyNeeds.get(goal.id) ?? null : null;
     const progress = need ? need.progress : clamp(num(goal.progress), 0, 100);
     const completed = need ? need.status === 'done' : progress >= 100;
     const weeklyHours = completed ? 0 : Math.max(0, num(plan.weeklyHours));
@@ -202,7 +206,8 @@ export function calculateGoalFeasibility(
     let monthlyNeed: number | null = null;
     let budgetUncomputable = false;
     if (remainingBudget > 0) {
-      if (monthsLeft && monthsLeft > 0) monthlyNeed = Math.ceil(remainingBudget / monthsLeft);
+      // お金の目標は、ボーナスから貯める分を除いた額を毎月の貯金でまかなう
+      if (monthsLeft && monthsLeft > 0) monthlyNeed = need ? (need.monthlyNeed ?? 0) : Math.ceil(remainingBudget / monthsLeft);
       else budgetUncomputable = true;
     } else {
       monthlyNeed = 0;
@@ -281,6 +286,8 @@ export function calculateGoalFeasibility(
       isMoney,
       purpose: isMoney ? (goal.moneyPurpose ?? 'save') : null,
       saved: need ? need.saved : 0,
+      fromBonus: need && !completed ? need.fromBonus : 0,
+      bonusTimes: need && !completed ? need.bonusUses.length : 0,
       progress,
     };
   });

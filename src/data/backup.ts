@@ -17,6 +17,7 @@ import {
   type LifeDomain,
   type MoneyItem,
   type NodeRef,
+  type OneOffItem,
   type Scenario,
   type TimeBudget,
   type TimeSource,
@@ -222,10 +223,11 @@ export function parseBackup(text: string): ImportResult {
       if (o.savingsTargetMode !== undefined) f.savingsTargetMode = r.oneOf(o.savingsTargetMode, `${w}.savingsTargetMode`, ['auto', 'manual'] as const);
       f.targetMonth = r.month(o.targetMonth, `${w}.targetMonth`, true);
       f.annualReturnRate = r.numIn(o.annualReturnRate, `${w}.annualReturnRate`, 0, 100, 0);
+      if (o.bonusSavingsRate !== undefined) f.bonusSavingsRate = r.numIn(o.bonusSavingsRate, `${w}.bonusSavingsRate`, 0, 100);
       f.oneOffs = r.arr(o.oneOffs ?? [], `${w}.oneOffs`).map((x, i) => {
         const ww = `${w}.oneOffs[${i}]`;
         const oo = r.obj(x, ww);
-        return {
+        const item: OneOffItem = {
           id: r.str(oo.id, `${ww}.id`),
           label: r.str(oo.label, `${ww}.label`, { allowEmpty: true, fallback: '' }),
           amount: r.numIn(oo.amount, `${ww}.amount`, 0, MONEY_MAX),
@@ -233,6 +235,8 @@ export function parseBackup(text: string): ImportResult {
           month: r.month(oo.month, `${ww}.month`),
           repeatYearly: r.bool(oo.repeatYearly, `${ww}.repeatYearly`, false),
         };
+        if (oo.bonus !== undefined) item.bonus = r.bool(oo.bonus, `${ww}.bonus`, false);
+        return item;
       });
       return f;
     };

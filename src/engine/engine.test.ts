@@ -12,6 +12,9 @@ import {
   breakdownTotal,
   calculateMoneyGoalNeed,
   calculateAutoSavingsTarget,
+  bonusSlots,
+  isBonusItem,
+  moneyGoalNeeds,
   resolveFinance,
   savingsTargetMode,
   cloneScenario,
@@ -546,6 +549,75 @@ describe('お金の目標（貯める・買う）', () => {
     // 未設定の古いデータは、目標額が入っていれば手動
     expect(savingsTargetMode({ ...s.finance, savingsTargetMode: undefined })).toBe('manual');
     expect(savingsTargetMode({ ...s.finance, savingsTargetMode: undefined, savingsTarget: 0 })).toBe('auto');
+  });
+});
+
+describe('ボーナスを見込んだお金の目標', () => {
+  const money = (id: string, saved = 0) => goal(id, { kind: 'money', moneyPurpose: 'save', savedAmount: saved });
+  // 夏（6月）と冬（12月）に 300,000円ずつのボーナス。貯金に回す割合は初期値 50%
+  const withBonus = (edit: (s: Scenario) => void) =>
+    scenarioWith((s) => {
+      s.finance.oneOffs = [
+        { id: 'w', label: '冬のボーナス', amount: 300000, type: 'income', month: '2025-12', repeatYearly: true },
+        { id: 's', label: '夏のボーナス', amount: 300000, type: 'income', month: '2026-06', repeatYearly: true },
+        { id: 'x', label: '帰省', amount: 60000, type: 'expense', month: '2026-12', repeatYearly: false },
+      ];
+      edit(s);
+    });
+
+  it('毎年くり返す収入をボーナスとして、今月から期限までの回数を数える', () => {
+    const s = withBonus(() => {});
+    const slots = bonusSlots(s.finance, TODAY, '2027-12');
+    // 2026-12（冬）、2027-06（夏）、2027-12（冬）。支出は数えない
+    expect(slots.map((b) => b.month)).toEqual(['2026-12', '2027-06', '2027-12']);
+    expect(slots.every((b) => b.save === 150000)).toBe(true);
+    // ボーナスとして使わない設定もできる
+    expect(isBonusItem({ id: 'o', label: '', amount: 1, type: 'income', month: '2026-01', repeatYearly: true, bonus: false })).toBe(false);
+    expect(isBonusItem({ id: 'o', label: '', amount: 1, type: 'income', month: '2026-01', repeatYearly: false, bonus: true })).toBe(true);
+  });
+
+  it('ボーナスで貯める額と、それ以外に毎月貯める額に分ける', () => {
+    // 600,000円を 2027-09 までに（12か月）。ボーナス 2026-12・2027-06 の 50% = 150,000 × 2 = 300,000
+    // 残り 300,000 ÷ 12 = 25,000円/月
+    const s = withBonus((s) => {
+      s.goalPlans.car = { ...defaultGoalPlan(1), budget: 600000, deadline: '2027-09-30' };
+    });
+    const n = moneyGoalNeeds(s, [money('car')], TODAY).get('car')!;
+    expect(n).toMatchObject({ remaining: 600000, months: 12, fromBonus: 300000, monthlyNeed: 25000, status: 'ok' });
+    expect(n.bonusUses.map((u) => [u.month, u.amount])).toEqual([
+      ['2026-12', 150000],
+      ['2027-06', 150000],
+    ]);
+    // 毎月の検証も、ボーナス以外の毎月の額で行う
+    const f = calculateGoalFeasibility(s, [money('car')], [], TODAY);
+    expect(f.goals[0]).toMatchObject({ monthlyNeed: 25000, fromBonus: 300000, bonusTimes: 2, monthlyShort: 0 });
+  });
+
+  it('同じボーナスを二重に数えない（優先順位の高い目標から使う）', () => {
+    const s = withBonus((s) => {
+      s.goalPlans.a = { ...defaultGoalPlan(1), budget: 200000, deadline: '2027-03-31' }; // 6か月、ボーナスは 2026-12 の 1回
+      s.goalPlans.b = { ...defaultGoalPlan(2), budget: 300000, deadline: '2027-03-31' };
+    });
+    const needs = moneyGoalNeeds(s, [money('a'), money('b')], TODAY);
+    // a: 150,000 をボーナスから、残り 50,000 ÷ 6 = 8,334
+    expect(needs.get('a')).toMatchObject({ fromBonus: 150000, monthlyNeed: 8334 });
+    // b: 冬のボーナスは a が使い切ったので 0、300,000 ÷ 6 = 50,000
+    expect(needs.get('b')).toMatchObject({ fromBonus: 0, monthlyNeed: 50000 });
+    const auto = calculateAutoSavingsTarget(s, [money('a'), money('b')], TODAY);
+    expect(auto).toMatchObject({ fromBonus: 150000, monthlyNeed: 58334, bonusRate: 50 });
+  });
+
+  it('ボーナスで足りれば、使うのは必要な額だけ。割合 0% ならボーナスを使わない', () => {
+    const s = withBonus((s) => {
+      s.goalPlans.a = { ...defaultGoalPlan(1), budget: 100000, deadline: '2027-03-31' };
+      s.goalPlans.b = { ...defaultGoalPlan(2), budget: 100000, deadline: '2027-03-31' };
+    });
+    const needs = moneyGoalNeeds(s, [money('a'), money('b')], TODAY);
+    expect(needs.get('a')).toMatchObject({ fromBonus: 100000, monthlyNeed: 0 });
+    // 残りの 50,000 を b が使う。残り 50,000 ÷ 6 = 8,334
+    expect(needs.get('b')).toMatchObject({ fromBonus: 50000, monthlyNeed: 8334 });
+    s.finance.bonusSavingsRate = 0;
+    expect(moneyGoalNeeds(s, [money('a')], TODAY).get('a')).toMatchObject({ fromBonus: 0, monthlyNeed: 16667 });
   });
 });
 

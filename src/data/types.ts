@@ -46,6 +46,11 @@ export interface OneOffItem {
   month: string;
   /** 毎年同じ月に繰り返す（ボーナスなど） */
   repeatYearly: boolean;
+  /**
+   * ボーナスとして、お金の目標の貯金の計算に使う（収入のときだけ）。
+   * 未設定の古いデータは「毎年くり返す収入」をボーナスとして扱う。
+   */
+  bonus?: boolean;
 }
 
 /** お金の内訳の種類（収入・固定費・変動費・毎月の貯金や積立） */
@@ -97,6 +102,8 @@ export interface FinancialProfile {
   annualReturnRate: number;
   /** 臨時収入・臨時支出 */
   oneOffs: OneOffItem[];
+  /** ボーナスのうち、お金の目標の貯金に回す割合（%、0〜100）。未設定は 50 */
+  bonusSavingsRate?: number;
 }
 
 /** 目標の時間をどの枠から使うか。'free' は配分されていない自由時間から */
