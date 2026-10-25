@@ -10,3 +10,4 @@ export * from './goals';
 export * from './moneyGoals';
 export * from './scenarios';
 export * from './deviation';
+export * from './world';

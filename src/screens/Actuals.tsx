@@ -21,8 +21,7 @@ import { fmtDate, fmtH, fmtHours, fmtNum, fmtPct, fmtShortDate, fmtYen, weekdayO
 import { Icon } from '../ui/Icon';
 import { ScreenHead } from '../ui/ScreenHead';
 import { CAT_COLOR, PeriodBars } from '../ui/viz';
-import { DevRow, describeRecord } from './Home';
-import { MONEY_COLORS } from './sim/MoneyTab';
+import { DevRow, MONEY_COLORS, describeRecord } from '../ui/recordViews';
 
 const KIND_OPTIONS: { value: PeriodKind; label: string }[] = [
   { value: 'day', label: '日' },
@@ -36,8 +35,9 @@ function periodLabel(p: Period, today: string): string {
   return `${p.start.slice(0, 4)}年${+p.start.slice(5, 7)}月`;
 }
 
-export function ActualsScreen() {
-  const { data, today, current, update } = useStore();
+/** 足跡（記録）と世界の観測（計画と実績の差・統計）。年代記の館の中で表示する */
+export function ActualsScreen({ embedded }: { embedded?: boolean } = {}) {
+  const { data, today, current } = useStore();
   const compact = data.settings.compactMoney;
   const [kind, setKind] = useState<PeriodKind>('week');
   const [offset, setOffset] = useState(0);
@@ -61,24 +61,19 @@ export function ActualsScreen() {
   const unrecorded = dev.time.filter((r) => !r.recorded && r.planned > 0).map((r) => TIME_LABELS[r.key]);
 
   const startNew = (type: ActualRecord['type'] = 'time') => {
-    const base = { id: newId('a-'), date: offset === 0 || kind !== 'day' ? today : period.start, goalId: null, memo: '', createdAt: nowIso() };
-    const rec: ActualRecord =
-      type === 'time'
-        ? { ...base, type, category: 'study', hours: 1 }
-        : type === 'expense'
-          ? { ...base, type, expenseCategory: 'variable', amount: 0 }
-          : type === 'task'
-            ? { ...base, type, title: '', estimateHours: 1, actualHours: 1 }
-            : { ...base, type, progress: 0 };
     setIsNew(true);
-    setEditing(rec);
+    setEditing(newRecord(type, offset === 0 || kind !== 'day' ? today : period.start));
   };
 
   return (
     <>
-      <ScreenHead eyebrow="実績" title="計画と現実の差">
-        <p className="screen-lead">実際に使った時間とお金を記録すると、計画とのずれが見えてきます。</p>
-      </ScreenHead>
+      {embedded ? (
+        <p className="screen-lead">足跡（実際に使った時間とお金）を残すと、計画とのずれが観測できます。</p>
+      ) : (
+        <ScreenHead eyebrow="世界の観測" title="計画と現実の差">
+          <p className="screen-lead">実際に使った時間とお金を記録すると、計画とのずれが見えてきます。</p>
+        </ScreenHead>
+      )}
 
       <div className="period-bar">
         <Segmented
@@ -266,32 +261,52 @@ export function ActualsScreen() {
         )}
       </section>
 
-      <RecordSheet
-        record={editing}
-        isNew={isNew}
-        onClose={() => setEditing(null)}
-        onSave={(r) => {
-          update(
-            (d) => {
-              const exists = d.actuals.some((a) => a.id === r.id);
-              let next = { ...d, actuals: exists ? d.actuals.map((a) => (a.id === r.id ? r : a)) : [...d.actuals, r] };
-              // 進捗の記録は、それが最新の記録なら目標の進捗にも反映する
-              if (r.type === 'progress' && r.goalId) {
-                const latest = next.actuals.filter((a) => a.type === 'progress' && a.goalId === r.goalId).sort((a, b) => b.date.localeCompare(a.date) || b.createdAt.localeCompare(a.createdAt))[0];
-                if (latest?.id === r.id) next = { ...next, goals: next.goals.map((g) => (g.id === r.goalId ? { ...g, progress: r.progress, updatedAt: nowIso() } : g)) };
-              }
-              return next;
-            },
-            { success: isNew ? '記録しました' : '保存しました' },
-          );
-          setEditing(null);
-        }}
-        onDelete={(r) => {
-          update((d) => ({ ...d, actuals: d.actuals.filter((a) => a.id !== r.id) }), { undo: '記録を削除しました' });
-          setEditing(null);
-        }}
-      />
+      <RecordEditor record={editing} isNew={isNew} onClose={() => setEditing(null)} />
     </>
+  );
+}
+
+/** 新しい足跡（記録）の下書き */
+export function newRecord(type: ActualRecord['type'], date: string): ActualRecord {
+  const base = { id: newId('a-'), date, goalId: null, memo: '', createdAt: nowIso() };
+  return type === 'time'
+    ? { ...base, type, category: 'study', hours: 1 }
+    : type === 'expense'
+      ? { ...base, type, expenseCategory: 'variable', amount: 0 }
+      : type === 'task'
+        ? { ...base, type, title: '', estimateHours: 1, actualHours: 1 }
+        : { ...base, type, progress: 0 };
+}
+
+/** 足跡（記録）の追加・編集・削除。保存処理もここで行う（世界の中心と年代記の館で共通） */
+export function RecordEditor({ record, isNew, onClose }: { record: ActualRecord | null; isNew: boolean; onClose: () => void }) {
+  const { update } = useStore();
+  return (
+    <RecordSheet
+      record={record}
+      isNew={isNew}
+      onClose={onClose}
+      onSave={(r) => {
+        update(
+          (d) => {
+            const exists = d.actuals.some((a) => a.id === r.id);
+            let next = { ...d, actuals: exists ? d.actuals.map((a) => (a.id === r.id ? r : a)) : [...d.actuals, r] };
+            // 進捗の記録は、それが最新の記録なら目標の進捗にも反映する
+            if (r.type === 'progress' && r.goalId) {
+              const latest = next.actuals.filter((a) => a.type === 'progress' && a.goalId === r.goalId).sort((a, b) => b.date.localeCompare(a.date) || b.createdAt.localeCompare(a.createdAt))[0];
+              if (latest?.id === r.id) next = { ...next, goals: next.goals.map((g) => (g.id === r.goalId ? { ...g, progress: r.progress, updatedAt: nowIso() } : g)) };
+            }
+            return next;
+          },
+          { success: isNew ? '足跡を残しました' : '保存しました' },
+        );
+        onClose();
+      }}
+      onDelete={(r) => {
+        update((d) => ({ ...d, actuals: d.actuals.filter((a) => a.id !== r.id) }), { undo: '記録を削除しました' });
+        onClose();
+      }}
+    />
   );
 }
 

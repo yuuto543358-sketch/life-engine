@@ -5,9 +5,10 @@
 import type { AppData } from './types';
 
 const DB_NAME = 'life-engine';
-const DB_VERSION = 1;
+/** 2: 年代記のストアを追加。古い版を開くと onupgradeneeded で足りないストアを作る（既存データはそのまま） */
+const DB_VERSION = 2;
 
-export const STORES = ['meta', 'domains', 'goals', 'scenarios', 'actuals', 'dependencies'] as const;
+export const STORES = ['meta', 'domains', 'goals', 'scenarios', 'actuals', 'dependencies', 'chronicle'] as const;
 export type StoreName = (typeof STORES)[number];
 
 let dbPromise: Promise<IDBDatabase> | null = null;
@@ -92,14 +93,15 @@ export interface RawData {
   scenarios: AppData['scenarios'];
   actuals: AppData['actuals'];
   dependencies: AppData['dependencies'];
+  chronicle: AppData['chronicle'];
 }
 
 export async function loadAll(): Promise<RawData> {
   const db = await open();
-  const [meta, domains, goals, scenarios, actuals, dependencies] = await Promise.all(
+  const [meta, domains, goals, scenarios, actuals, dependencies, chronicle] = await Promise.all(
     STORES.map((s) => getAll<never>(db, s)),
   );
-  return { meta, domains, goals, scenarios, actuals, dependencies } as RawData;
+  return { meta, domains, goals, scenarios, actuals, dependencies, chronicle } as RawData;
 }
 
 /** 1件以上の追加・更新・削除を1つのトランザクションで実行する（途中で失敗したら全部取り消し） */
@@ -133,6 +135,7 @@ export function replaceAll(data: AppData | null): Promise<void> {
     for (const s of data.scenarios) tx.objectStore('scenarios').put(s);
     for (const a of data.actuals) tx.objectStore('actuals').put(a);
     for (const d of data.dependencies) tx.objectStore('dependencies').put(d);
+    for (const c of data.chronicle) tx.objectStore('chronicle').put(c);
   });
 }
 

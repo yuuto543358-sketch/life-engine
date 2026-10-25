@@ -7,7 +7,8 @@
  * - 日付: ローカル日付の文字列 "YYYY-MM-DD"、年月は "YYYY-MM"。
  */
 
-export const SCHEMA_VERSION = 1;
+/** データ形式の版。2: 年代記（旅の記録・節目・静寂の地）と目標の完了日を追加 */
+export const SCHEMA_VERSION = 2;
 
 /** 時間カテゴリ（週の時間配分の項目）。順番はグラフの積み上げ順と色の割り当て順を兼ねる */
 export const TIME_CATEGORY_KEYS = [
@@ -151,7 +152,37 @@ export interface Goal {
   note: string;
   createdAt: string;
   updatedAt: string;
+  /** 達成した日 "YYYY-MM-DD"（進捗が100%になった日。自動で記録） */
+  completedAt?: string;
   pos?: { x: number; y: number };
+  isSample?: boolean;
+}
+
+/** 年代記の記録の種類。journal = 旅の記録（日記）、milestone = 節目、quiet = 静寂の地での記録 */
+export type ChronicleKind = 'journal' | 'milestone' | 'quiet';
+/** 静寂の地での記録の種類 */
+export type QuietKind = 'free' | 'reflection' | 'tomorrow' | 'nothing';
+
+/** 年代記の館に保存する記録。目標や記録を消しても、ここに残した記憶は消えない */
+export interface ChronicleEntry {
+  id: string;
+  kind: ChronicleKind;
+  /** 出来事の日 "YYYY-MM-DD" */
+  date: string;
+  title: string;
+  body: string;
+  /** 写真（端末内で縮小した画像のデータURL）。最大4枚 */
+  photos: string[];
+  /** 関連する開拓計画（目標） */
+  goalId: string | null;
+  /** 静寂の地での記録の種類 */
+  quietKind?: QuietKind;
+  /** 明日の準備: 小さな一歩（最大3つ） */
+  steps?: string[];
+  /** 何もしない時間（分） */
+  minutes?: number;
+  createdAt: string;
+  updatedAt: string;
   isSample?: boolean;
 }
 
@@ -273,4 +304,6 @@ export interface AppData {
   scenarios: Scenario[];
   actuals: ActualRecord[];
   dependencies: Dependency[];
+  /** 年代記（旅の記録・節目・静寂の地）。版1のデータにはない */
+  chronicle: ChronicleEntry[];
 }

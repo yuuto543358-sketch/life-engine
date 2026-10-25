@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
 
-export type TabKey = 'home' | 'sim' | 'map' | 'log' | 'settings';
-export const TABS: TabKey[] = ['home', 'sim', 'map', 'log', 'settings'];
+/** home = 世界の中心, map = 世界地図, sim = 開拓の間, log = 年代記の館, quiet = 静寂の地, settings = 世界の調律 */
+export type TabKey = 'home' | 'map' | 'sim' | 'log' | 'quiet' | 'settings';
+export const TABS: TabKey[] = ['home', 'map', 'sim', 'log', 'quiet', 'settings'];
 
 export interface Route {
   tab: TabKey;

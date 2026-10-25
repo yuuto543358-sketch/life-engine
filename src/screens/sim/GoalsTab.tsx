@@ -27,10 +27,10 @@ export function GoalsTab({ scenario, edit }: { scenario: Scenario; edit: EditSce
       <>
         <Empty
           icon="target"
-          title="目標がまだありません"
+          title="開拓計画（目標）がまだありません"
           action={
             <button type="button" className="btn btn-primary" onClick={() => setAdding(true)}>
-              <Icon name="plus" size={18} /> 目標を追加
+              <Icon name="plus" size={18} /> 開拓計画（目標）を立てる
             </button>
           }
         >
@@ -44,7 +44,7 @@ export function GoalsTab({ scenario, edit }: { scenario: Scenario; edit: EditSce
   return (
     <div className="stack-l">
       <section className="panel" aria-label="目標の両立チェック">
-        <p className="hero-label">目標の両立チェック</p>
+        <p className="hero-label">開拓計画（目標）の両立チェック</p>
         {f.conflicts.length === 0 ? (
           <div className="callout callout-good">
             <Icon name="check" size={18} />
@@ -100,7 +100,7 @@ export function GoalsTab({ scenario, edit }: { scenario: Scenario; edit: EditSce
         <div className="section-head">
           <h2 className="section-title">優先順位の順</h2>
           <button type="button" className="btn btn-small btn-primary" onClick={() => setAdding(true)}>
-            <Icon name="plus" size={16} /> 目標
+            <Icon name="plus" size={16} /> 開拓計画
           </button>
         </div>
         <div className="goal-list">

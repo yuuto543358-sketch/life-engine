@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { newId, nowIso, useStore } from '../data/store';
 import { defaultGoalPlan } from '../data/defaults';
-import { TIME_CATEGORY_KEYS, type AppData, type Goal, type GoalKind, type GoalPlan, type TimeSource } from '../data/types';
+import { TIME_CATEGORY_KEYS, type AppData, type ChronicleEntry, type Goal, type GoalKind, type GoalPlan, type TimeSource } from '../data/types';
 import { TIME_SOURCE_LABELS, calculateMoneyGoalNeed, isValidDate } from '../engine';
 import { fmtMonth, fmtYen } from './format';
 import { Disclosure, NumberField, Segmented, SelectField, Sheet, StatusTag, Stepper, TextField, Toggle } from './controls';
@@ -156,7 +156,7 @@ export function NewGoalSheet({ open, onClose, scenarioId, domainId, onCreated, i
     <Sheet
       open={open}
       onClose={onClose}
-      title="目標を追加"
+      title="開拓計画（目標）を立てる"
       footer={
         <button
           type="button"
@@ -228,10 +228,21 @@ function nextPriority(d: AppData, scenarioId: string): number {
   return Math.min(9, (ps.length ? Math.max(...ps) : 0) + 1);
 }
 
-/** 目標を削除する（全シナリオの計画値・つながりも取り除き、実績は目標なしとして残す） */
+/**
+ * 目標を削除する（全シナリオの計画値・つながりも取り除き、実績は目標なしとして残す）。
+ * 記憶の法則: 達成済みの目標は、節目がまだ年代記になければ記念碑として残す。
+ */
 export function deleteGoal(d: AppData, goalId: string): AppData {
+  const goal = d.goals.find((g) => g.id === goalId);
+  const hasMilestone = d.chronicle.some((c) => c.kind === 'milestone' && c.goalId === goalId);
+  const now = nowIso();
+  const keep: ChronicleEntry[] =
+    goal && goal.completedAt && !hasMilestone
+      ? [{ id: newId('c-'), kind: 'milestone', date: goal.completedAt, title: `${goal.name}を達成`, body: '', photos: [], goalId: null, createdAt: now, updatedAt: now }]
+      : [];
   return {
     ...d,
+    chronicle: [...d.chronicle.map((c) => (c.goalId === goalId ? { ...c, goalId: null, title: c.title || goal?.name || '' } : c)), ...keep],
     goals: d.goals.filter((g) => g.id !== goalId),
     scenarios: d.scenarios.map((s) => {
       if (!(goalId in s.goalPlans)) return s;

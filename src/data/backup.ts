@@ -9,6 +9,7 @@ import {
   type AppData,
   type AppSettings,
   type BackupFile,
+  type ChronicleEntry,
   type Dependency,
   type FinancialProfile,
   type Goal,
@@ -40,7 +41,9 @@ function isObj(v: unknown): v is Obj {
 }
 
 const MAX_ITEMS = 50000;
-const MAX_TEXT = 2000;
+const MAX_TEXT = 20000;
+/** 写真1枚のデータURLの上限（約3MB） */
+const MAX_PHOTO_LENGTH = 4_000_000;
 
 function makeReader(errors: string[]) {
   const fail = (where: string, msg: string): never => {
@@ -163,6 +166,7 @@ export function parseBackup(text: string): ImportResult {
         note: r.str(o.note, `${w}.note`, { allowEmpty: true, fallback: '' }),
         createdAt: r.str(o.createdAt, `${w}.createdAt`, { fallback: now }),
         updatedAt: r.str(o.updatedAt, `${w}.updatedAt`, { fallback: now }),
+        ...(o.completedAt !== undefined ? { completedAt: r.date(o.completedAt, `${w}.completedAt`) } : {}),
         pos: r.pos(o.pos, `${w}.pos`),
         ...(o.isSample === true ? { isSample: true } : {}),
       };
@@ -337,7 +341,38 @@ export function parseBackup(text: string): ImportResult {
     dupCheck(actuals, 'actuals');
     dupCheck(dependencies, 'dependencies');
 
-    const data: AppData = { profile, settings, domains, goals, scenarios, actuals, dependencies };
+    // 年代記（版2から）。版1のファイルにはないので空にする
+    const chronicle: ChronicleEntry[] = r.arr(d.chronicle ?? [], 'chronicle').map((v, i) => {
+      const w = `chronicle[${i}]`;
+      const o = r.obj(v, w);
+      const goalId = o.goalId === null || o.goalId === undefined ? null : r.str(o.goalId, `${w}.goalId`);
+      const photos = r.arr(o.photos ?? [], `${w}.photos`).map((p, j) => {
+        const ph = typeof p === 'string' ? p : r.fail(`${w}.photos[${j}]`, '文字列ではありません');
+        if (!/^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+/=]+$/.test(ph)) r.fail(`${w}.photos[${j}]`, '画像の形式ではありません');
+        if (ph.length > MAX_PHOTO_LENGTH) r.fail(`${w}.photos[${j}]`, '画像が大きすぎます');
+        return ph;
+      });
+      if (photos.length > 4) r.fail(`${w}.photos`, '写真は4枚までです');
+      const entry: ChronicleEntry = {
+        id: r.str(o.id, `${w}.id`),
+        kind: r.oneOf(o.kind, `${w}.kind`, ['journal', 'milestone', 'quiet'] as const),
+        date: r.date(o.date, `${w}.date`),
+        title: r.str(o.title, `${w}.title`, { allowEmpty: true, fallback: '' }),
+        body: r.str(o.body, `${w}.body`, { allowEmpty: true, fallback: '' }),
+        photos,
+        goalId: goalId && goalIds.has(goalId) ? goalId : null,
+        createdAt: r.str(o.createdAt, `${w}.createdAt`, { fallback: now }),
+        updatedAt: r.str(o.updatedAt, `${w}.updatedAt`, { fallback: now }),
+        ...(o.quietKind !== undefined ? { quietKind: r.oneOf(o.quietKind, `${w}.quietKind`, ['free', 'reflection', 'tomorrow', 'nothing'] as const) } : {}),
+        ...(o.steps !== undefined ? { steps: r.arr(o.steps, `${w}.steps`).slice(0, 3).map((x, j) => r.str(x, `${w}.steps[${j}]`, { allowEmpty: true })) } : {}),
+        ...(o.minutes !== undefined ? { minutes: r.numIn(o.minutes, `${w}.minutes`, 0, 1440) } : {}),
+        ...(o.isSample === true ? { isSample: true } : {}),
+      };
+      return entry;
+    });
+    dupCheck(chronicle, 'chronicle');
+
+    const data: AppData = { profile, settings, domains, goals, scenarios, actuals, dependencies, chronicle };
     return {
       ok: true,
       data,
@@ -347,6 +382,7 @@ export function parseBackup(text: string): ImportResult {
         シナリオ: scenarios.length,
         実績: actuals.length,
         つながり: dependencies.length,
+        年代記: chronicle.length,
         領域: domains.length,
       },
     };

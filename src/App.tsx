@@ -5,15 +5,17 @@ import { href, useRoute, type TabKey } from './ui/router';
 import { HomeScreen } from './screens/Home';
 import { SimulatorScreen } from './screens/Simulator';
 import { LifeMapScreen } from './screens/LifeMap';
-import { ActualsScreen } from './screens/Actuals';
+import { ChronicleScreen } from './screens/Chronicle';
 import { SettingsScreen } from './screens/Settings';
+import { QuietScreen } from './screens/Quiet';
 
+/** 世界の5つの場所。設定（世界の調律）は世界の中心の右上から開く */
 const TAB_ITEMS: { key: TabKey; label: string; icon: string }[] = [
-  { key: 'home', label: 'ホーム', icon: 'home' },
-  { key: 'sim', label: 'シミュレーター', icon: 'sim' },
-  { key: 'map', label: '人生マップ', icon: 'map' },
-  { key: 'log', label: '実績', icon: 'log' },
-  { key: 'settings', label: '設定', icon: 'settings' },
+  { key: 'home', label: '世界の中心', icon: 'center' },
+  { key: 'map', label: '世界地図', icon: 'map' },
+  { key: 'sim', label: '開拓の間', icon: 'compass' },
+  { key: 'log', label: '年代記', icon: 'hall' },
+  { key: 'quiet', label: '静寂の地', icon: 'moon' },
 ];
 
 export function App() {
@@ -49,10 +51,13 @@ export function App() {
       screen = <LifeMapScreen />;
       break;
     case 'log':
-      screen = <ActualsScreen />;
+      screen = <ChronicleScreen route={route} />;
       break;
     case 'settings':
       screen = <SettingsScreen />;
+      break;
+    case 'quiet':
+      screen = <QuietScreen />;
       break;
     default:
       screen = <HomeScreen />;
@@ -60,12 +65,12 @@ export function App() {
 
   return (
     <div className="app">
-      <main className="screen" key={route.tab}>
+      <main className={`screen screen-${route.tab}`} key={route.tab}>
         {screen}
       </main>
       <nav className="tabbar" aria-label="メインメニュー">
         {TAB_ITEMS.map((t) => (
-          <a key={t.key} href={href(t.key)} className="tab" aria-current={route.tab === t.key ? 'page' : undefined}>
+          <a key={t.key} href={href(t.key)} className="tab" aria-current={route.tab === t.key || (t.key === 'home' && route.tab === 'settings') ? 'page' : undefined}>
             <Icon name={t.icon} size={24} stroke={route.tab === t.key ? 2 : 1.6} />
             <span>{t.label}</span>
           </a>

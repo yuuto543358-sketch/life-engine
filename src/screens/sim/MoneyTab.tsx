@@ -19,12 +19,8 @@ const HORIZONS = [
   { value: '120', label: '10年' },
 ] as const;
 
-export const MONEY_COLORS = {
-  fixed: 'var(--c-sleep)',
-  variable: 'var(--c-work)',
-  savings: 'var(--c-commute)',
-  goals: 'var(--c-housework)',
-};
+import { MONEY_COLORS } from '../../ui/recordViews';
+export { MONEY_COLORS };
 
 export function MoneyTab({ scenario, edit }: { scenario: Scenario; edit: EditScenario }) {
   const { data, today, current } = useStore();

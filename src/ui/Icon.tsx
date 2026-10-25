@@ -38,6 +38,18 @@ const PATHS: Record<string, string> = {
   swap: 'M7 7h12l-3-3M17 17H5l3 3',
   calendar: 'M4.5 6h15v14h-15zM4.5 10h15M8.5 3.5V7M15.5 3.5V7',
   note: 'M6 4h9l3 3v13H6zM9 11h6M9 14.5h6',
+  center: 'M12 3v2M12 19v2M3 12h2M19 12h2M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8zM6.3 6.3l1.4 1.4M16.3 16.3l1.4 1.4M17.7 6.3l-1.4 1.4M7.7 16.3l-1.4 1.4',
+  scroll: 'M7 4h10a2 2 0 0 1 2 2v1H9V6a2 2 0 0 0-2-2zM7 4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V9M9 7v11M12 11h4M12 14h4',
+  compass: 'M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18zM15.5 8.5l-2 5-5 2 2-5z',
+  hall: 'M3.5 9.5 12 4l8.5 5.5M5 9.5V19M9 11v8M15 11v8M19 9.5V19M3.5 19.5h17',
+  leaf: 'M5 19C5 10 11 5 20 5c0 9-5 15-14 15zM5 19l8-8',
+  feather: 'M19 5c-6 0-11 5-11 11v3h3c6 0 11-5 11-11V5zM8 16 4 20M12 12h5',
+  sprout: 'M12 20v-8M12 12C12 8 9 6 5 6c0 4 3 6 7 6zM12 12c0-4 3-6 7-6 0 4-3 6-7 6z',
+  lantern: 'M10 3h4M12 3v2M8 7h8l-1 10H9zM8 7c0-1 1.5-2 4-2s4 1 4 2M10 20h4M12 17v3',
+  mountain: 'M3 19 9 9l4 6 3-4 5 8z',
+  bridge: 'M3 16h18M5 16v-3a7 7 0 0 1 14 0v3M9 16v-4M15 16v-4',
+  monument: 'M10 20 11 7l1-3 1 3 1 13zM7 20h10',
+  photo: 'M4 6h16v13H4zM4 15l4-4 4 4 3-3 5 5M15 9.5a1 1 0 1 0 0 .01',
 };
 
 export type IconName = keyof typeof PATHS | string;

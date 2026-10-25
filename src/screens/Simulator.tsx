@@ -16,8 +16,8 @@ import { CompareTab } from './sim/CompareTab';
 type SimTab = 'time' | 'money' | 'goals' | 'compare';
 const SIM_TABS: { value: SimTab; label: string }[] = [
   { value: 'time', label: '時間' },
-  { value: 'money', label: 'お金' },
-  { value: 'goals', label: '目標' },
+  { value: 'money', label: '蓄え・お金' },
+  { value: 'goals', label: '開拓計画' },
   { value: 'compare', label: '比較' },
 ];
 
@@ -39,7 +39,7 @@ export function SimulatorScreen({ route }: { route: Route }) {
 
   return (
     <>
-      <ScreenHead eyebrow="シミュレーター" title="人生の計画を試す">
+      <ScreenHead eyebrow="開拓の間 · 計画とシミュレーション" title="これからの道筋を試す">
         <button type="button" className="scenario-switch" onClick={() => setPicker(true)} aria-haspopup="dialog">
           <span className="scenario-switch-label">編集中のシナリオ</span>
           <span className="scenario-switch-name">
@@ -132,7 +132,7 @@ function EngineBar({ scenario, onJump }: { scenario: Scenario; onJump: (t: SimTa
       </button>
       <button type="button" className={`engine-cell ${goalsOk ? '' : 'is-bad'}`} onClick={() => onJump('goals')}>
         <span className="engine-label">
-          <Icon name={goalsOk ? 'target' : 'alert'} size={14} /> 目標の両立
+          <Icon name={goalsOk ? 'flag' : 'alert'} size={14} /> 計画の両立
         </span>
         <span className="engine-value">
           <span className="num">{f.fitCount}</span>

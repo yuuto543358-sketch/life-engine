@@ -20,6 +20,7 @@ function sampleData(): AppData {
     scenarios: [current, ...s.scenarios],
     actuals: s.actuals,
     dependencies: s.dependencies,
+    chronicle: s.chronicle,
   };
 }
 

@@ -5,6 +5,7 @@ import {
   CURRENT_SCENARIO_ID,
   type ActualRecord,
   type Dependency,
+  type ChronicleEntry,
   type Goal,
   type GoalPlan,
   type Scenario,
@@ -17,6 +18,7 @@ export interface SampleBundle {
   goals: Goal[];
   dependencies: Dependency[];
   actuals: ActualRecord[];
+  chronicle: ChronicleEntry[];
   /** 現在の計画に使う時間・お金（未設定の場合のみ適用） */
   time: TimeBudget;
   finance: FinancialProfile;
@@ -47,6 +49,7 @@ export function buildSample(today: string, now: string): SampleBundle {
     { ...mkGoal('s-trip', '北海道旅行の資金', 'd-hobby', 20, null, ''), kind: 'money', moneyPurpose: 'buy', savedAmount: 30000 },
     { ...mkGoal('s-move', '職場の近くへ引っ越す費用', 'd-living', 17, 20, ''), kind: 'money', moneyPurpose: 'buy', savedAmount: 50000 },
     { ...mkGoal('s-emergency', '生活防衛資金', 'd-money', 60, null, ''), kind: 'money', moneyPurpose: 'save', savedAmount: 600000 },
+    { ...mkGoal('s-toeic', 'TOEIC 700点', 'd-learning', 100, 120, '700点以上を取る'), completedAt: addDays(today, -41) },
   ];
 
   const goalPlans: Record<string, GoalPlan> = {
@@ -55,6 +58,7 @@ export function buildSample(today: string, now: string): SampleBundle {
     's-run': { included: true, deadline: `${addMonths(ym, 5)}-15`, weeklyHours: 4, timeSource: 'hobby', budget: 25000, priority: 3 },
     's-trip': { included: true, deadline: `${addMonths(ym, 10)}-28`, weeklyHours: 0, timeSource: 'free', budget: 150000, priority: 4 },
     's-move': { included: true, deadline: `${addMonths(ym, 14)}-28`, weeklyHours: 1, timeSource: 'free', budget: 300000, priority: 5 },
+    's-toeic': { included: true, deadline: addDays(today, -30), weeklyHours: 0, timeSource: 'study', budget: 0, priority: 7 },
     's-emergency': { included: true, deadline: `${addMonths(ym, 17)}-28`, weeklyHours: 0, timeSource: 'free', budget: 1000000, priority: 6 },
   };
 
@@ -177,6 +181,29 @@ export function buildSample(today: string, now: string): SampleBundle {
     { id: `s-a${n++}`, date: addDays(today, -1), type: 'progress', progress: 35, goalId: 's-cert', memo: '', createdAt: now, isSample: true },
   );
 
+  // 年代記
+  const ce = (id: string, back: number, kind: ChronicleEntry['kind'], title: string, body: string, extra: Partial<ChronicleEntry> = {}): ChronicleEntry => ({
+    id,
+    kind,
+    date: addDays(today, -back),
+    title,
+    body,
+    photos: [],
+    goalId: null,
+    createdAt: now,
+    updatedAt: now,
+    isSample: true,
+    ...extra,
+  });
+  const chronicle: ChronicleEntry[] = [
+    ce('s-c1', 41, 'milestone', 'TOEIC 700点に届いた', '半年かけた勉強が形になった。', { goalId: 's-toeic' }),
+    ce('s-c2', 26, 'journal', '朝の川沿いを走った', '少し寒かったけれど、走り終えたあとのコーヒーがおいしかった。', { goalId: 's-run' }),
+    ce('s-c3', 15, 'journal', '過去問で6割', '午前問題でやっと6割。ネットワーク分野がまだ弱い。', { goalId: 's-cert' }),
+    ce('s-c4', 9, 'quiet', '', '今週は少し詰め込みすぎた。週末は何も予定を入れない。', { quietKind: 'reflection' }),
+    ce('s-c5', 3, 'quiet', '', '', { quietKind: 'nothing', minutes: 40 }),
+    ce('s-c6', 1, 'quiet', '', '', { quietKind: 'tomorrow', steps: ['過去問を1回分', '洗濯', '早めに寝る'] }),
+  ];
+
   // シナリオ
   const base = emptyScenario(now);
   const mk = (id: string, name: string, note: string, edit: (s: Scenario) => void): Scenario => {
@@ -216,7 +243,7 @@ export function buildSample(today: string, now: string): SampleBundle {
     }),
   ];
 
-  return { goals, dependencies, actuals, time, finance, goalPlans, scenarios };
+  return { goals, dependencies, actuals, chronicle, time, finance, goalPlans, scenarios };
 }
 
 export const SAMPLE_GOAL_PREFIX = 's-';

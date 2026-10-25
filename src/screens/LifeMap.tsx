@@ -2,7 +2,9 @@ import { useEffect, useMemo, useRef, useState, type PointerEvent as RPointerEven
 import { newId, nowIso, useStore } from '../data/store';
 import { CURRENT_SCENARIO_ID, type AppData, type Dependency, type LifeDomain, type NodeRef } from '../data/types';
 import type { GoalFeasibility } from '../engine';
-import { ConfirmSheet, Meter, SectionHead, SelectField, Sheet, StatusTag, TextField } from '../ui/controls';
+import { ConfirmSheet, Meter, SectionHead, Segmented, SelectField, Sheet, StatusTag, TextField } from '../ui/controls';
+import { WorldMap } from '../world/WorldMap';
+import { useWorld } from '../world/useWorld';
 import { fmtDate, fmtH, fmtYen } from '../ui/format';
 import { Icon, DOMAIN_ICONS } from '../ui/Icon';
 import { NewGoalSheet, deleteGoal } from '../ui/GoalEditor';
@@ -96,6 +98,8 @@ export function LifeMapScreen() {
   const [newGoalDomain, setNewGoalDomain] = useState<string | null | undefined>(undefined);
   const [confirmDelete, setConfirmDelete] = useState<NodeRef | null>(null);
   const [depAdd, setDepAdd] = useState(false);
+  const [view, setView] = useState<'map' | 'graph'>('map');
+  const { state: world } = useWorld();
 
   const nameOf = (r: NodeRef) => nodeMap.get(keyOf(r))?.label ?? '（削除済み）';
 
@@ -151,11 +155,50 @@ export function LifeMapScreen() {
 
   return (
     <>
-      <ScreenHead eyebrow="人生マップ" title="人生の全体像">
-        <p className="screen-lead">領域と目標、そのつながりを俯瞰します。つながりはあなたが登録したものだけを表示します。</p>
+      <ScreenHead eyebrow="世界地図" title="あなたの世界の地図">
+        <p className="screen-lead">人生の領域を、ひとつの地図として眺めます。場所を押すと、その領域の開拓計画・記録・つながりを確認できます。</p>
+        <div className="sim-tabs">
+          <Segmented
+            label="地図の表示"
+            options={[
+              { value: 'map', label: '世界地図' },
+              { value: 'graph', label: 'つながり図' },
+            ]}
+            value={view}
+            onChange={setView}
+          />
+        </div>
       </ScreenHead>
 
-      <section className="map-wrap" aria-label="人生マップ">
+      {view === 'map' && (
+        <section className="world-map-wrap" aria-label="世界地図">
+          <WorldMap
+            state={world}
+            goals={data.goals}
+            dependencies={data.dependencies}
+            domainNames={Object.fromEntries(data.domains.map((d) => [d.id, d.name]))}
+            selected={selected?.kind === 'domain' ? selected.id : null}
+            onSelect={(id) => setSelected({ kind: 'domain', id })}
+          />
+          <p className="fineprint">
+            霧の中の場所は、まだ開拓計画も記録もない「未踏の地」です。未熟さではなく、これからの可能性を表します。金色の道は、あなたが登録したつながり（連結の法則）です。
+          </p>
+          <div className="map-add">
+            <button type="button" className="btn btn-small btn-ghost" onClick={() => setNewGoalDomain(null)}>
+              <Icon name="plus" size={16} /> 開拓計画
+            </button>
+            <button type="button" className="btn btn-small btn-ghost" onClick={() => setAddDomain(true)}>
+              <Icon name="plus" size={16} /> 領域（場所）
+            </button>
+            <button type="button" className="btn btn-small btn-ghost" onClick={() => setDepAdd(true)} disabled={nodes.length < 2}>
+              <Icon name="link" size={16} /> つながり
+            </button>
+          </div>
+        </section>
+      )}
+
+      {view === 'graph' && (
+      <section className="map-wrap" aria-label="つながり図">
         {connectFrom && (
           <div className="map-banner" role="status">
             <Icon name="link" size={16} /> 「{shorten(nameOf(connectFrom), 12)}」からつなぐ先をタップ
@@ -192,6 +235,7 @@ export function LifeMapScreen() {
         </ul>
         <p className="fineprint">丸をタップすると詳細とつながりの説明を表示します。丸をドラッグすると配置を変更、背景のドラッグで移動、2本指で拡大・縮小できます。</p>
       </section>
+      )}
 
       <section className="section">
         <SectionHead
@@ -547,6 +591,7 @@ function MapCanvas({ nodes, deps, selected, connectFrom, onTap, onMove, onBackgr
 
 function NodeSheet({ node, onClose, nameOf, compact, feas, onConnect, onAddGoal, onEditDomain, onDelete }: { node: NodeRef | null; onClose: () => void; nameOf: (r: NodeRef) => string; compact: boolean; feas: Map<string, GoalFeasibility>; onConnect: (r: NodeRef) => void; onAddGoal: (domainId: string) => void; onEditDomain: (d: LifeDomain) => void; onDelete: (r: NodeRef) => void }) {
   const { data, update } = useStore();
+  const { state: world } = useWorld();
   if (!node) return <Sheet open={false} onClose={onClose} title="">{null}</Sheet>;
   const deps = data.dependencies.filter((d) => keyOf(d.from) === keyOf(node) || keyOf(d.to) === keyOf(node));
   const depList = deps.length > 0 && (
@@ -572,6 +617,7 @@ function NodeSheet({ node, onClose, nameOf, compact, feas, onConnect, onAddGoal,
 
   if (node.kind === 'domain') {
     const domain = data.domains.find((d) => d.id === node.id);
+    const structure = world.structures.find((x) => x.domainId === node.id);
     if (!domain) return null;
     const goals = data.goals.filter((g) => g.domainId === domain.id);
     const rs = goals.map((g) => feas.get(g.id)).filter(Boolean) as GoalFeasibility[];
@@ -600,6 +646,15 @@ function NodeSheet({ node, onClose, nameOf, compact, feas, onConnect, onAddGoal,
       >
         <div className="stack-m">
           {domain.note && <p className="sheet-lead">{domain.note}</p>}
+          {structure && (
+            <div className="place-structure">
+              <p className="place-structure-name">
+                {structure.name} · {structure.level === 0 ? 'まだ可能性として眠っている' : `第${structure.level}段階`}
+              </p>
+              <p className="small">{structure.basis}</p>
+              {structure.next && <p className="small muted">{structure.next}</p>}
+            </div>
+          )}
           <dl className="stats">
             <div className="stat">
               <dt>目標</dt>
@@ -636,7 +691,7 @@ function NodeSheet({ node, onClose, nameOf, compact, feas, onConnect, onAddGoal,
             </ul>
           )}
           <button type="button" className="btn btn-ghost btn-block" onClick={() => onAddGoal(domain.id)}>
-            <Icon name="plus" size={18} /> この領域に目標を追加
+            <Icon name="plus" size={18} /> この領域に開拓計画を立てる
           </button>
           {depList}
         </div>

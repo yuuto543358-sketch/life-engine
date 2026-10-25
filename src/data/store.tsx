@@ -4,6 +4,7 @@ import { cloneScenario, structuredCloneSafe } from '../engine/scenarios';
 import { loadAll, replaceAll, requestPersistence, write, StorageError, type StoreName, type WriteOp } from './db';
 import { defaultDomains, defaultProfile, defaultSettings, emptyScenario } from './defaults';
 import { buildSample } from './sample';
+import { stampCompletions } from './stamps';
 import {
   CURRENT_SCENARIO_ID,
   type AppData,
@@ -22,8 +23,8 @@ export interface Toast {
   sticky?: boolean;
 }
 
-type CollectionKey = 'domains' | 'goals' | 'scenarios' | 'actuals' | 'dependencies';
-const COLLECTIONS: CollectionKey[] = ['domains', 'goals', 'scenarios', 'actuals', 'dependencies'];
+type CollectionKey = 'domains' | 'goals' | 'scenarios' | 'actuals' | 'dependencies' | 'chronicle';
+const COLLECTIONS: CollectionKey[] = ['domains', 'goals', 'scenarios', 'actuals', 'dependencies', 'chronicle'];
 
 /** 2つの状態の差分から、保存すべき追加・更新・削除を求める（オブジェクトの参照で比較する） */
 export function diffData(prev: AppData, next: AppData): WriteOp[] {
@@ -89,6 +90,7 @@ function emptyData(now: string): AppData {
     scenarios: [emptyScenario(now)],
     actuals: [],
     dependencies: [],
+    chronicle: [],
   };
 }
 
@@ -119,6 +121,7 @@ function normalize(raw: Awaited<ReturnType<typeof loadAll>>): { data: AppData; c
       scenarios,
       actuals: raw.actuals,
       dependencies: raw.dependencies,
+      chronicle: raw.chronicle ?? [],
     },
     changed,
   };
@@ -161,6 +164,8 @@ export function StoreProvider({ children, fallback }: { children: ReactNode; fal
   const [toasts, setToasts] = useState<Toast[]>([]);
 
   const dataRef = useRef(data);
+  const todayRef = useRef(today);
+  todayRef.current = today;
   const persistedRef = useRef(data);
   const timer = useRef<number | null>(null);
   const flushing = useRef<Promise<void> | null>(null);
@@ -248,7 +253,7 @@ export function StoreProvider({ children, fallback }: { children: ReactNode; fal
   const update = useCallback<StoreValue['update']>(
     (fn, opts = {}) => {
       const prev = dataRef.current;
-      const next = fn(prev);
+      const next = stampCompletions(prev, fn(prev), todayRef.current);
       if (next === prev) return;
       dataRef.current = next;
       setData(next);
@@ -340,6 +345,7 @@ export function StoreProvider({ children, fallback }: { children: ReactNode; fal
           goals: [...d.goals, ...sample.goals],
           dependencies: [...d.dependencies, ...sample.dependencies],
           actuals: [...d.actuals, ...sample.actuals],
+          chronicle: [...d.chronicle, ...sample.chronicle],
           scenarios: [...scenarios, ...sample.scenarios],
         };
       },
@@ -377,6 +383,7 @@ export function StoreProvider({ children, fallback }: { children: ReactNode; fal
             (x) => !x.isSample && !(x.from.kind === 'goal' && sampleGoalIds.has(x.from.id)) && !(x.to.kind === 'goal' && sampleGoalIds.has(x.to.id)),
           ),
           domains: d.domains.filter((x) => !x.isSample),
+          chronicle: d.chronicle.filter((c) => !c.isSample).map((c) => (c.goalId && sampleGoalIds.has(c.goalId) ? { ...c, goalId: null } : c)),
           scenarios,
         };
       },
