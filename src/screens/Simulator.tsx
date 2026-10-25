@@ -39,7 +39,7 @@ export function SimulatorScreen({ route }: { route: Route }) {
 
   return (
     <>
-      <ScreenHead eyebrow="開拓の間 · 計画とシミュレーション" title="これからの道筋を試す">
+      <ScreenHead place="sim" eyebrow="開拓の間 · 計画とシミュレーション" title="これからの道筋を試す">
         <button type="button" className="scenario-switch" onClick={() => setPicker(true)} aria-haspopup="dialog">
           <span className="scenario-switch-label">編集中のシナリオ</span>
           <span className="scenario-switch-name">

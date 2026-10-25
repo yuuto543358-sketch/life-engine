@@ -1,4 +1,5 @@
-import { useEffect, type ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
+import { MotionConfig, motion } from 'motion/react';
 import { useStore } from './data/store';
 import { Icon } from './ui/Icon';
 import { href, useRoute, type TabKey } from './ui/router';
@@ -21,26 +22,29 @@ const TAB_ITEMS: { key: TabKey; label: string; icon: string }[] = [
 export function App() {
   const route = useRoute();
   const { data } = useStore();
-  const { theme, motion, textSize } = data.settings;
+  const { theme, motion: motionSetting, textSize } = data.settings;
+  const [reduced, setReduced] = useState(false);
 
   // 表示設定を <html> に反映する
   useEffect(() => {
     const root = document.documentElement;
     if (theme === 'system') delete root.dataset.theme;
     else root.dataset.theme = theme;
-    if (motion === 'system') delete root.dataset.motion;
-    else root.dataset.motion = motion;
+    if (motionSetting === 'system') delete root.dataset.motion;
+    else root.dataset.motion = motionSetting;
     root.dataset.text = textSize;
     const mq = window.matchMedia('(prefers-reduced-motion: reduce)');
     const apply = () => {
-      root.dataset.reduced = String(motion === 'reduce' || (motion === 'system' && mq.matches));
+      const r = motionSetting === 'reduce' || (motionSetting === 'system' && mq.matches);
+      root.dataset.reduced = String(r);
+      setReduced(r);
       const dark = theme === 'dark' || (theme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
       document.querySelector('meta[name="theme-color"]')?.setAttribute('content', dark ? '#0d0d0d' : '#f4f3ef');
     };
     apply();
     mq.addEventListener('change', apply);
     return () => mq.removeEventListener('change', apply);
-  }, [theme, motion, textSize]);
+  }, [theme, motionSetting, textSize]);
 
   let screen: ReactNode;
   switch (route.tab) {
@@ -64,20 +68,30 @@ export function App() {
   }
 
   return (
-    <div className="app">
-      <main className={`screen screen-${route.tab}`} key={route.tab}>
-        {screen}
-      </main>
-      <nav className="tabbar" aria-label="メインメニュー">
-        {TAB_ITEMS.map((t) => (
-          <a key={t.key} href={href(t.key)} className="tab" aria-current={route.tab === t.key || (t.key === 'home' && route.tab === 'settings') ? 'page' : undefined}>
-            <Icon name={t.icon} size={24} stroke={route.tab === t.key ? 2 : 1.6} />
-            <span>{t.label}</span>
-          </a>
-        ))}
-      </nav>
-      <Toasts />
-    </div>
+    <MotionConfig reducedMotion={reduced ? 'always' : 'never'}>
+      <div className="app">
+        <main className={`screen screen-${route.tab}`} key={route.tab}>
+          {screen}
+        </main>
+        <nav className="tabbar" aria-label="メインメニュー">
+          <div className="tabbar-inner">
+            {TAB_ITEMS.map((t) => {
+              const active = route.tab === t.key || (t.key === 'home' && route.tab === 'settings');
+              return (
+                <a key={t.key} href={href(t.key)} className="tab" aria-current={active ? 'page' : undefined}>
+                  {active && <motion.span layoutId="tab-pill" className="tab-pill" transition={{ type: 'spring', stiffness: 520, damping: 40, mass: 0.9 }} />}
+                  <motion.span className="tab-icon" animate={active ? { y: -1, scale: 1.08 } : { y: 0, scale: 1 }} transition={{ type: 'spring', stiffness: 600, damping: 22 }}>
+                    <Icon name={t.icon} size={22} stroke={active ? 2 : 1.6} />
+                  </motion.span>
+                  <span className="tab-label">{t.label}</span>
+                </a>
+              );
+            })}
+          </div>
+        </nav>
+        <Toasts />
+      </div>
+    </MotionConfig>
   );
 }
 

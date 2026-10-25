@@ -66,6 +66,7 @@
   --gutter: 20px;
   --tabbar-h: 64px;
   --ease: cubic-bezier(0.2, 0.7, 0.2, 1);
+  --ease-spring: cubic-bezier(0.18, 1.12, 0.32, 1);
   --dur: 220ms;
 }
 

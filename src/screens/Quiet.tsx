@@ -6,7 +6,7 @@ import { NumberField, TextField } from '../ui/controls';
 import { fmtDate, fmtShortDate, weekdayOf } from '../ui/format';
 import { Icon } from '../ui/Icon';
 import { newChronicle } from '../ui/ChronicleEditor';
-import { WorldScene } from '../world/WorldScene';
+import { LivingWorld } from '../paint/world/LivingWorld';
 import { useWorld } from '../world/useWorld';
 
 const MODES: { key: QuietKind; label: string; icon: string; lead: string }[] = [
@@ -32,7 +32,7 @@ export function QuietScreen() {
   return (
     <div className="quiet">
       <section className="quiet-hero" aria-hidden="true">
-        <WorldScene state={state} phase="night" quiet />
+        <LivingWorld state={state} frame="lake" quiet hour={21.5} />
       </section>
       <div className="quiet-body">
         <p className="eyebrow">静寂の地</p>

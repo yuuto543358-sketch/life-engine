@@ -10,7 +10,7 @@ import { ChronicleEditor, newChronicle } from '../ui/ChronicleEditor';
 import { describeRecord } from '../ui/recordViews';
 import { navigate, type Route } from '../ui/router';
 import { ScreenHead } from '../ui/ScreenHead';
-import { WorldScene } from '../world/WorldScene';
+import { LivingWorld } from '../paint/world/LivingWorld';
 import { useWorld } from '../world/useWorld';
 import { ActualsScreen, RecordEditor } from './Actuals';
 import { LAW_ICONS } from './Home';
@@ -35,7 +35,7 @@ export function ChronicleScreen({ route }: { route: Route }) {
   const sub = route.sub === 'observe' ? 'observe' : 'timeline';
   return (
     <>
-      <ScreenHead eyebrow="年代記の館" title={sub === 'observe' ? '足跡と世界の観測' : '世界の年代記'}>
+      <ScreenHead place="log" eyebrow="年代記の館" title={sub === 'observe' ? '足跡と世界の観測' : '世界の年代記'}>
         <div className="sim-tabs">
           <Segmented
             label="年代記の館の部屋"
@@ -258,7 +258,7 @@ function MonthWorld({ ym, onClose, input, today }: { ym: string | null; onClose:
   return (
     <Sheet open onClose={onClose} title={`${ym.slice(0, 4)}年${+ym.slice(5)}月の世界`}>
       <div className="month-world">
-        <WorldScene state={w} phase="day" />
+        <LivingWorld state={w} frame="full" still hour={11} />
       </div>
       <p className="sheet-lead">
         {ERA_LABELS[w.era].name}・{fmtShortDate(asOf)}時点

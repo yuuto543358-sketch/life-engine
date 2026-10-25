@@ -60,7 +60,7 @@ export function SettingsScreen() {
 
   return (
     <>
-      <ScreenHead eyebrow="世界の調律" title="設定とデータ">
+      <ScreenHead place="settings" eyebrow="世界の調律" title="設定とデータ">
         <a className="back-link" href="#/home">
           <Icon name="chevron-left" size={16} /> 世界の中心へ戻る
         </a>

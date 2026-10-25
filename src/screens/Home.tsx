@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useStore } from '../data/store';
 import type { ActualRecord, ChronicleEntry } from '../data/types';
 import { ERA_LABELS, LAW_LABELS, REGION_LABELS, nextSteps, recentEvents, type LawKey, type WorldStructure } from '../engine';
@@ -11,7 +11,8 @@ import { href, navigate } from '../ui/router';
 import { describeRecord } from '../ui/recordViews';
 import { ChronicleEditor, newChronicle } from '../ui/ChronicleEditor';
 import { RecordEditor, newRecord } from './Actuals';
-import { WorldScene } from '../world/WorldScene';
+import { LivingWorld } from '../paint/world/LivingWorld';
+import { motion, useScroll, useTransform } from 'motion/react';
 import { useWorld } from '../world/useWorld';
 import { computeWorld } from '../engine/world';
 
@@ -55,16 +56,17 @@ export function HomeScreen() {
     const dawn = computeWorld({ ...input, goals: [], actuals: [], chronicle: [], dependencies: [] }, today);
     return (
       <>
-        <section className="wc-hero wc-hero-intro">
-          <WorldScene state={dawn} />
+        <Stage world={<LivingWorld state={dawn} visible={0.56} />}>
           <div className="wc-top">
             <div>
               <p className="wc-world">VERDANTH</p>
               <p className="wc-era">{ERA_LABELS.dawn.name}</p>
             </div>
           </div>
-        </section>
-        <div className="wc-body wc-intro">
+        </Stage>
+        <div className="wc-sheet wc-sheet-intro">
+          <div className="wc-grabber" aria-hidden="true" />
+          <div className="wc-body wc-intro">
           <p className="myth">
             世界の始まりにあった小さな光は、大地に落ちて種となりました。
             <br />
@@ -94,6 +96,7 @@ export function HomeScreen() {
             </button>
           </div>
           <p className="fineprint">AI や外部サービスは使いません。データはこの端末の中だけに保存されます。</p>
+          </div>
         </div>
         <OnboardingSheet open={setup} onClose={() => setSetup(false)} />
       </>
@@ -102,8 +105,7 @@ export function HomeScreen() {
 
   return (
     <>
-      <section className="wc-hero" aria-label="あなたの世界">
-        <WorldScene state={state} onSelect={setSelected} />
+      <Stage world={<LivingWorld state={state} onSelect={setSelected} focus={selected?.domainId ?? null} revealKey="verdanth.seen-levels" />}>
         <div className="wc-top">
           <div>
             <p className="wc-world">VERDANTH</p>
@@ -122,21 +124,47 @@ export function HomeScreen() {
           </div>
         </div>
         <p className="wc-caption">{era.meaning}</p>
-      </section>
+      </Stage>
 
-      <div className="wc-body">
+      <div className="wc-sheet">
+        <div className="wc-grabber" aria-hidden="true" />
+        <div className="wc-body">
         <TodayFootprints onAdd={(t) => setRecord(newRecord(t, today))} onJournal={() => setEntry(newChronicle('journal', today))} onEdit={setRecord} />
         <NextSteps input={input} />
         <ActivePlans />
         <RecentChanges events={recentEvents(state)} />
         <WorldStatus state={state} onSelect={setSelected} />
         <Balance />
+        </div>
       </div>
 
       <StructureSheet s={selected} onClose={() => setSelected(null)} />
       <RecordEditor record={record} isNew={!!record && !data.actuals.some((a) => a.id === record.id)} onClose={() => setRecord(null)} />
       <ChronicleEditor entry={entry} isNew={!!entry && !data.chronicle.some((c) => c.id === entry.id)} onClose={() => setEntry(null)} />
     </>
+  );
+}
+
+/**
+ * 世界の舞台。画面いっぱいの風景の上を、情報のシートがせり上がってくる。
+ * シートが上がるほど、風景は少し暗く・奥へ沈む（スクロールに連動）。
+ */
+function Stage({ world, children }: { world: ReactNode; children: ReactNode }) {
+  const { scrollY } = useScroll();
+  const vh = typeof window !== 'undefined' ? window.innerHeight : 800;
+  const shade = useTransform(scrollY, [0, vh * 0.55], [0, 0.42]);
+  const scale = useTransform(scrollY, [0, vh * 0.55], [1, 1.05]);
+  const topFade = useTransform(scrollY, [0, vh * 0.22], [1, 0]);
+  return (
+    <section className="wc-stage" aria-label="あなたの世界">
+      <motion.div className="wc-stage-inner" style={{ scale }}>
+        {world}
+      </motion.div>
+      <motion.div className="wc-stage-shade" style={{ opacity: shade }} aria-hidden="true" />
+      <motion.div className="wc-stage-overlay" style={{ opacity: topFade }}>
+        {children}
+      </motion.div>
+    </section>
   );
 }
 

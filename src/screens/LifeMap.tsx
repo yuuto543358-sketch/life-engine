@@ -155,7 +155,7 @@ export function LifeMapScreen() {
 
   return (
     <>
-      <ScreenHead eyebrow="世界地図" title="あなたの世界の地図">
+      <ScreenHead place="map" eyebrow="世界地図" title="あなたの世界の地図">
         <p className="screen-lead">人生の領域を、ひとつの地図として眺めます。場所を押すと、その領域の開拓計画・記録・つながりを確認できます。</p>
         <div className="sim-tabs">
           <Segmented

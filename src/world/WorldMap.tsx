@@ -1,23 +1,29 @@
-import { useId, useMemo } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type { Dependency, Goal } from '../data/types';
 import type { WorldState } from '../engine/world';
-import { ArtDefs, PALETTES, Structure, Tree, seeded } from './art';
+import { makeCanvas } from '../paint/core';
+import { loadImage, saveImage, type Img } from '../paint/cache';
+import { FLORA, lightAt, seasonOf } from '../paint/light';
+import { MAP_H, MAP_W, paintMap } from '../paint/map/mapPaint';
+import { runJob, type PaintJob } from '../paint/scheduler';
+import { paintStructure, type Sprite } from '../paint/world/sprites';
+import { hashSeed } from '../paint/core';
 
 /** 地図上の場所（領域ごとに決まった位置） */
 const PLACES: Record<string, [number, number]> = {
-  'd-learning': [300, 168],
+  'd-learning': [300, 172],
   'd-work': [300, 268],
-  'd-relations': [200, 236],
-  'd-health': [92, 236],
-  'd-living': [140, 316],
-  'd-hobby': [74, 330],
-  'd-money': [246, 334],
+  'd-relations': [208, 236],
+  'd-health': [94, 252],
+  'd-living': [140, 336],
+  'd-hobby': [62, 318],
+  'd-money': [262, 344],
 };
 const EXTRA: [number, number][] = [
-  [200, 140],
-  [350, 340],
-  [60, 160],
-  [196, 372],
+  [196, 150],
+  [350, 330],
+  [62, 160],
+  [200, 384],
 ];
 
 export function placeOf(domainIds: string[], id: string): [number, number] {
@@ -26,19 +32,21 @@ export function placeOf(domainIds: string[], id: string): [number, number] {
   return EXTRA[Math.max(0, custom.indexOf(id)) % EXTRA.length];
 }
 
-const ISLAND = 'M40,120 C70,80 140,70 200,78 C270,70 350,86 372,140 C392,190 378,250 384,300 C390,350 350,392 282,388 C220,392 170,396 120,384 C60,376 22,340 26,280 C30,230 14,170 40,120Z';
+/** 地図の上の建物の印の大きさ（建物の絵に対する倍率） */
+const ICON = 0.36;
+
+const icons = new Map<string, Sprite>();
 
 /**
- * 世界地図（上から見た古地図の風）。領域は場所として描き、記録も計画もない場所は霧に包まれる。
- * つながり（連結の法則）は、関係する領域どうしを結ぶ道として描く。
+ * 世界地図（上から見た水彩の古地図）。領域は場所として描き、記録も計画もない場所は霧に包まれる。
+ * つながり（連結の法則）は、関係する領域どうしを結ぶ金色の道として描く。
+ * 絵はキャンバスに、名前や押せる場所は文字が読みやすいよう上に重ねた SVG に描く。
  */
 export function WorldMap({ state, goals, dependencies, domainNames, onSelect, selected }: { state: WorldState; goals: Goal[]; dependencies: Dependency[]; domainNames: Record<string, string>; onSelect: (domainId: string) => void; selected?: string | null }) {
-  const id = useId().replace(/:/g, '');
-  const p = PALETTES.day;
   const ids = state.structures.map((s) => s.domainId);
   const goalDomain = useMemo(() => new Map(goals.map((g) => [g.id, g.domainId])), [goals]);
-  const domainOf = (r: { kind: 'goal' | 'domain'; id: string }) => (r.kind === 'domain' ? r.id : goalDomain.get(r.id) ?? null);
   const roads = useMemo(() => {
+    const domainOf = (r: { kind: 'goal' | 'domain'; id: string }) => (r.kind === 'domain' ? r.id : goalDomain.get(r.id) ?? null);
     const seen = new Set<string>();
     const out: [string, string][] = [];
     for (const d of dependencies) {
@@ -51,84 +59,186 @@ export function WorldMap({ state, goals, dependencies, domainNames, onSelect, se
       out.push([a, b]);
     }
     return out;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dependencies, goalDomain]);
-  const forest = useMemo(() => {
-    const r = seeded(31);
-    return Array.from({ length: 34 }, () => ({ x: 40 + r() * 120, y: 170 + r() * 60, k: (r() > 0.5 ? 1 : 0) as 0 | 1 })).sort((a, b) => a.y - b.y);
-  }, []);
   const unexplored = new Set(state.unexploredDomains);
   const center = PLACES['d-relations'];
 
   return (
-    <svg className="world-map" viewBox="0 0 400 420" role="img" aria-label={`世界地図。場所 ${ids.length}か所、まだ霧の中の場所 ${unexplored.size}か所、つながりの道 ${roads.length}本。`}>
-      <ArtDefs id={id} />
-      <rect width="400" height="420" fill="#efe6d2" />
-      <rect width="400" height="420" filter={`url(#${id}-paper)`} />
-      {/* 海と島 */}
-      <path d={ISLAND} fill="#a7bdb3" opacity={0.35} transform="translate(0,6) scale(1.02)" />
-      <path d={ISLAND} fill="#cfd3b5" stroke="#8a7f66" strokeWidth={1.2} filter={`url(#${id}-rough)`} />
-      {/* 原生域の山脈 */}
-      <g filter={`url(#${id}-rough)`}>
-        {[90, 130, 170, 215, 255, 295, 330].map((x, i) => (
-          <path key={x} d={`M${x - 22},${118 + (i % 2) * 8} L${x},${92 + (i % 3) * 6} L${x + 22},${118 + (i % 2) * 8}Z`} fill="#b8b7a0" stroke="#8a7f66" strokeWidth={0.8} />
-        ))}
-      </g>
-      <rect x={40} y={80} width={330} height={52} fill="#f3eee2" opacity={0.25 + state.mist * 0.45} className="w-mist" />
-      <text x={200} y={74} textAnchor="middle" className="map-region-label">原生域</text>
-      {/* 川 */}
-      <path d="M210,96 C200,140 236,170 222,210 C210,250 170,270 180,320 C186,350 212,370 206,396" stroke="#8fb1ad" strokeWidth={5} fill="none" strokeLinecap="round" />
-      {/* 自然域の森 */}
-      {forest.slice(0, Math.min(forest.length, 10 + Math.floor(state.nature.trees * 0.66))).map((t, i) => (
-        <Tree key={i} x={t.x} y={t.y} s={0.5} kind={t.k} p={p} />
-      ))}
-      <text x={60} y={160} className="map-region-label">自然域</text>
-      {/* 道（中心の広場から、歩いたことのある場所へ） */}
-      {state.structures
-        .filter((s) => s.domainId !== 'd-relations' && !unexplored.has(s.domainId))
-        .map((s) => {
-          const [x, y] = placeOf(ids, s.domainId);
-          return <path key={s.domainId} d={`M${center[0]},${center[1]} Q${(center[0] + x) / 2 + 12},${(center[1] + y) / 2 - 10} ${x},${y}`} stroke="#9a8a66" strokeWidth={1.4} fill="none" strokeDasharray="3 3" opacity={0.7} />;
+    <div className="world-map">
+      <MapCanvas state={state} />
+      <svg className="world-map-overlay" viewBox={`0 0 ${MAP_W} ${MAP_H}`} role="img" aria-label={`世界地図。場所 ${ids.length}か所、まだ霧の中の場所 ${unexplored.size}か所、つながりの道 ${roads.length}本。`}>
+        <defs>
+          <radialGradient id="map-mist">
+            <stop offset="0" stopColor="#f6f1e4" stopOpacity="0.95" />
+            <stop offset="0.6" stopColor="#f6f1e4" stopOpacity="0.6" />
+            <stop offset="1" stopColor="#f6f1e4" stopOpacity="0" />
+          </radialGradient>
+          <filter id="map-ink" x="-10%" y="-10%" width="120%" height="120%">
+            <feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="2" seed="4" />
+            <feDisplacementMap in="SourceGraphic" scale="1.4" />
+          </filter>
+        </defs>
+        {/* 原生域の霧（まだ知らない領域が多いほど濃い） */}
+        <g className="map-mist-band" opacity={0.25 + state.mist * 0.6}>
+          <ellipse cx={150} cy={104} rx={110} ry={22} fill="url(#map-mist)" />
+          <ellipse cx={280} cy={98} rx={120} ry={20} fill="url(#map-mist)" />
+        </g>
+        <text x={200} y={70} textAnchor="middle" className="map-region-label">原 生 域</text>
+        <text x={58} y={176} className="map-region-label">自 然 域</text>
+        <text x={258} y={214} className="map-region-label">道と集落</text>
+
+        {/* 歩いたことのある場所への小道（中心の広場から） */}
+        {state.structures
+          .filter((s) => s.domainId !== 'd-relations' && !unexplored.has(s.domainId))
+          .map((s) => {
+            const [x, y] = placeOf(ids, s.domainId);
+            return <path key={s.domainId} d={`M${center[0]},${center[1]} Q${(center[0] + x) / 2 + 12},${(center[1] + y) / 2 - 10} ${x},${y}`} className="map-trail" />;
+          })}
+        {/* 連結の法則: 登録したつながりの道（描かれていくように現れる） */}
+        {roads.map(([a, b], i) => {
+          const [x1, y1] = placeOf(ids, a);
+          const [x2, y2] = placeOf(ids, b);
+          const d = `M${x1},${y1} Q${(x1 + x2) / 2},${(y1 + y2) / 2 + 18} ${x2},${y2}`;
+          return (
+            <g key={`${a}-${b}`} filter="url(#map-ink)">
+              <path d={d} className="map-road-glow" />
+              <path d={d} pathLength={1} className="map-road" style={{ animationDelay: `${0.25 + i * 0.18}s` }} />
+            </g>
+          );
         })}
-      {/* 連結の法則: 登録したつながりの道 */}
-      {roads.map(([a, b]) => {
-        const [x1, y1] = placeOf(ids, a);
-        const [x2, y2] = placeOf(ids, b);
-        return <path key={`${a}-${b}`} d={`M${x1},${y1} Q${(x1 + x2) / 2},${(y1 + y2) / 2 + 18} ${x2},${y2}`} stroke="#b08a3e" strokeWidth={2.4} fill="none" strokeLinecap="round" />;
-      })}
-      {/* 場所 */}
-      {state.structures.map((s) => {
-        const [x, y] = placeOf(ids, s.domainId);
-        const misty = unexplored.has(s.domainId);
-        const flags = goals.filter((g) => g.domainId === s.domainId && !g.completedAt).length;
-        return (
-          <g key={s.domainId} className="w-tap map-place" onClick={() => onSelect(s.domainId)} role="button" aria-label={`${domainNames[s.domainId] ?? s.domainName}（${s.name}・第${s.level}段階${misty ? '・まだ霧の中' : ''}）`}>
-            <circle cx={x} cy={y - 8} r={24} fill="transparent" />
-            {selected === s.domainId && <circle cx={x} cy={y - 6} r={22} fill="none" stroke="#b08a3e" strokeWidth={1.5} strokeDasharray="2 3" />}
-            <Structure kind={s.kind} level={s.level} x={x} y={y} p={p} planned={s.planned} />
-            {misty && <ellipse cx={x} cy={y - 8} rx={26} ry={16} fill="#f3eee2" opacity={0.75} className="w-mist" />}
-            <text x={x} y={y + 13} textAnchor="middle" className="map-place-name">
-              {domainNames[s.domainId] ?? s.domainName}
-            </text>
-            <text x={x} y={y + 23} textAnchor="middle" className="map-place-sub">
-              {misty ? '未踏の地' : `${s.name}${flags ? `・旗${flags}` : ''}`}
-            </text>
-          </g>
-        );
-      })}
-      {/* 記念碑の数 */}
-      {state.monuments.length > 0 && (
-        <text x={center[0]} y={center[1] - 30} textAnchor="middle" className="map-place-sub">
-          記念碑 {state.monuments.length}基
-        </text>
-      )}
-      {/* 方位と題字 */}
-      <g transform="translate(352,62)" opacity={0.75}>
-        <circle r={14} fill="none" stroke="#8a7f66" strokeWidth={0.8} />
-        <path d="M0,-16 L3,0 L0,16 L-3,0Z" fill="#8a7f66" />
-        <text y={-19} textAnchor="middle" className="map-place-sub">北</text>
-      </g>
-      <text x={24} y={404} className="map-title">VERDANTH 世界地図</text>
-    </svg>
+
+        {/* 場所 */}
+        {state.structures.map((s) => {
+          const [x, y] = placeOf(ids, s.domainId);
+          const misty = unexplored.has(s.domainId);
+          const flags = goals.filter((g) => g.domainId === s.domainId && !g.completedAt).length;
+          const name = domainNames[s.domainId] ?? s.domainName;
+          const label = `${name}（${s.name}・第${s.level}段階${misty ? '・まだ霧の中' : ''}）`;
+          return (
+            <g
+              key={s.domainId}
+              className={`map-place${selected === s.domainId ? ' is-selected' : ''}`}
+              onClick={() => onSelect(s.domainId)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  onSelect(s.domainId);
+                }
+              }}
+              role="button"
+              tabIndex={0}
+              aria-label={label}
+            >
+              <circle cx={x} cy={y - 10} r={26} className="map-hit" />
+              {selected === s.domainId && <circle cx={x} cy={y - 8} r={24} className="map-ring" />}
+              {misty && (
+                <g className="map-mist">
+                  <ellipse cx={x} cy={y - 10} rx={34} ry={20} fill="url(#map-mist)" />
+                </g>
+              )}
+              {flags > 0 && !misty && (
+                <g transform={`translate(${x + 15},${y - 30})`} className="map-flag">
+                  <path d="M0,0 L0,14" stroke="#4a3a2a" strokeWidth={0.9} />
+                  <path d="M0,0 L9,2.5 L0,5Z" fill="#c9a24a" />
+                </g>
+              )}
+              <text x={x} y={y + 13} textAnchor="middle" className="map-place-name">
+                {name}
+              </text>
+              <text x={x} y={y + 23} textAnchor="middle" className="map-place-sub">
+                {misty ? '未踏の地' : `${s.name}${flags ? `・旗${flags}` : ''}`}
+              </text>
+            </g>
+          );
+        })}
+        {state.monuments.length > 0 && (
+          <text x={center[0]} y={center[1] - 34} textAnchor="middle" className="map-place-sub">
+            記念碑 {state.monuments.length}基
+          </text>
+        )}
+        <text x={MAP_W - 52} y={30} textAnchor="middle" className="map-place-sub">北</text>
+        <g className="map-cartouche" transform="translate(26,388)">
+          <path d="M0,-12 L150,-12 L156,-4 L150,4 L0,4 L6,-4Z" />
+          <text x={78} y={-0.5} textAnchor="middle">VERDANTH 世界地図</text>
+        </g>
+      </svg>
+    </div>
   );
+}
+
+/** 地図の絵（下絵と建物の印）。描いた絵は端末に保存して使い回す */
+function MapCanvas({ state }: { state: WorldState }) {
+  const ref = useRef<HTMLCanvasElement>(null);
+  const [width, setWidth] = useState(0);
+  useEffect(() => {
+    const el = ref.current!;
+    const ro = new ResizeObserver(() => setWidth(Math.round(el.getBoundingClientRect().width)));
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
+  const iconsKey = state.structures.map((s) => `${s.kind}:${s.level}:${s.planned ? 1 : 0}`).join(',');
+  useEffect(() => {
+    if (!width) return;
+    const canvas = ref.current!;
+    const dpr = Math.min(2, window.devicePixelRatio || 1);
+    const k = Math.round(((width / MAP_W) * dpr) * 4) / 4;
+    canvas.width = Math.round(MAP_W * k);
+    canvas.height = Math.round(MAP_H * k);
+    const ctx = canvas.getContext('2d')!;
+    const season = seasonOf(state.asOf);
+    const F = FLORA[season];
+    const trees = state.nature.trees;
+    let cancelled = false;
+    const baseKey = `map|${trees}|${season}|${k}`;
+    const ids = state.structures.map((s) => s.domainId);
+    const env = { L: lightAt(11), F, px: k * ICON * 1.3 };
+
+    const drawIcons = () => {
+      const sorted = [...state.structures].map((s) => ({ s, p: placeOf(ids, s.domainId) })).sort((a, b) => a.p[1] - b.p[1]);
+      for (const { s, p } of sorted) {
+        const sp = icons.get(`${s.kind}:${s.level}:${s.planned}:${env.px}`);
+        if (!sp) continue;
+        const sc = ICON * k;
+        ctx.drawImage(sp.canvas as CanvasImageSource, (p[0] - sp.ax * ICON) * k, (p[1] - sp.ay * ICON) * k, sp.w * sc, sp.h * sc);
+      }
+    };
+
+    (async () => {
+      let base: Img | null = (await loadImage(baseKey))?.img ?? null;
+      if (!base) {
+        const { canvas: c, ctx: cx } = makeCanvas(MAP_W * k, MAP_H * k);
+        cx.scale(k, k);
+        await runJob(paintMap(cx, { trees, leaves: F.leaves }), true).done;
+        base = c;
+        saveImage(baseKey, c);
+      }
+      if (cancelled) return;
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.drawImage(base as CanvasImageSource, 0, 0, canvas.width, canvas.height);
+      canvas.dataset.ready = 'true';
+      // 建物の印を、ひとつずつ描いて置く
+      function* iconJob(): PaintJob {
+        for (const s of state.structures) {
+          const key = `${s.kind}:${s.level}:${s.planned}:${env.px}`;
+          if (!icons.has(key)) {
+            icons.set(key, paintStructure(s.kind, s.level, s.planned, env, hashSeed(s.kind)));
+            yield;
+          }
+        }
+      }
+      drawIcons();
+      await runJob(iconJob()).done;
+      if (cancelled) return;
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.drawImage(base as CanvasImageSource, 0, 0, canvas.width, canvas.height);
+      drawIcons();
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [width, iconsKey, state.nature.trees, state.asOf]);
+
+  return <canvas ref={ref} className="world-map-canvas" aria-hidden="true" />;
 }
