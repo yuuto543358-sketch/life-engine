@@ -7,12 +7,13 @@ import { fmtDate, fmtShortDate, weekdayOf } from '../ui/format';
 import { Icon } from '../ui/Icon';
 import { newChronicle } from '../ui/ChronicleEditor';
 import { LivingWorld } from '../paint/world/LivingWorld';
+import { TopActions } from '../ui/GuideSheet';
 import { useWorld } from '../world/useWorld';
 
 const MODES: { key: QuietKind; label: string; icon: string; lead: string }[] = [
   { key: 'free', label: '自由に書く', icon: 'feather', lead: '頭の中にあることを、そのまま置いていく場所です。' },
   { key: 'reflection', label: '今日をふりかえる', icon: 'leaf', lead: '答えなくてもかまいません。書きたいところだけ。' },
-  { key: 'tomorrow', label: '明日の準備', icon: 'lantern', lead: '明日の小さな一歩を3つまで。世界の中心に「昨日の自分から」として届きます。' },
+  { key: 'tomorrow', label: '明日の準備', icon: 'lantern', lead: '明日の小さな一歩を3つまで。ホーム（世界の中心）の「次の一歩」に届きます。' },
   { key: 'nothing', label: '何もしない時間', icon: 'moon', lead: '何もしなかった時間も、立派な時間です。水辺に蛍が増えます。' },
 ];
 
@@ -34,8 +35,11 @@ export function QuietScreen() {
       <section className="quiet-hero" aria-hidden="true">
         <LivingWorld state={state} frame="lake" quiet hour={21.5} />
       </section>
+      <div className="quiet-actions">
+        <TopActions />
+      </div>
       <div className="quiet-body">
-        <p className="eyebrow">静寂の地</p>
+        <p className="eyebrow">静寂の地（休む場所）</p>
         <h1 className="title">ここでは、何も急がなくていい。</h1>
         {mode === null ? (
           <div className="quiet-modes">
@@ -76,7 +80,7 @@ export function QuietScreen() {
             </ul>
           </details>
         )}
-        <p className="fineprint quiet-note">ここでの記録は年代記の館にも残ります。書かなくても、何も変わりません。</p>
+        <p className="fineprint quiet-note">ここでの記録は「記録」（年代記の館）にも残ります。書かなくても、何も変わりません。</p>
       </div>
     </div>
   );

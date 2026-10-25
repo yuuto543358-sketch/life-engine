@@ -90,7 +90,7 @@ export function ChronicleEditor({ entry, isNew, onClose }: { entry: ChronicleEnt
               onClick={() => {
                 const e = { ...draft, title: draft.title.trim(), updatedAt: nowIso() };
                 update((d) => ({ ...d, chronicle: d.chronicle.some((c) => c.id === e.id) ? d.chronicle.map((c) => (c.id === e.id ? e : c)) : [...d.chronicle, e] }), {
-                  success: isNew ? '年代記に残しました' : '保存しました',
+                  success: isNew ? '記録（年代記）に残しました' : '保存しました',
                 });
                 onClose();
               }}

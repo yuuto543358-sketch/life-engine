@@ -35,13 +35,14 @@ export function ChronicleScreen({ route }: { route: Route }) {
   const sub = route.sub === 'observe' ? 'observe' : 'timeline';
   return (
     <>
-      <ScreenHead place="log" eyebrow="年代記の館" title={sub === 'observe' ? '足跡と世界の観測' : '世界の年代記'}>
+      <ScreenHead place="log" eyebrow="年代記の館" title="記録">
+        <p className="screen-lead">{sub === 'observe' ? '毎日の記録（足跡）を集計して、計画との差や推移を見ます。' : '日記・写真・節目と、世界の変化を、日付の順にふりかえります。毎日の記録の集計は「予定と実績」へ。'}</p>
         <div className="sim-tabs">
           <Segmented
             label="年代記の館の部屋"
             options={[
-              { value: 'timeline', label: '年代記（過去の記録）' },
-              { value: 'observe', label: '足跡と観測（統計）' },
+              { value: 'timeline', label: '日記・できごと' },
+              { value: 'observe', label: '予定と実績' },
             ]}
             value={sub}
             onChange={(v) => navigate('log', v === 'observe' ? 'observe' : '')}

@@ -7,6 +7,7 @@ import { fmtMonth, fmtMonths, fmtYen, splitYen } from '../../ui/format';
 import { Icon } from '../../ui/Icon';
 import { useScenarioModel } from '../../ui/model';
 import { BreakdownEditor } from '../../ui/BreakdownEditor';
+import { SectionNav } from '../../ui/SectionNav';
 import { NewGoalSheet } from '../../ui/GoalEditor';
 import { setSavingsTotal } from '../../data/breakdowns';
 import { FlowBar, Legend, ProjectionChart } from '../../ui/viz';
@@ -46,7 +47,18 @@ export function MoneyTab({ scenario, edit }: { scenario: Scenario; edit: EditSce
 
   return (
     <div className="stack-l">
-      <section className="panel panel-hero" aria-label="毎月のお金の流れ">
+      <SectionNav
+        label="お金のページの目次"
+        items={[
+          { id: 'm-flow', label: '月の収支' },
+          { id: 'm-breakdown', label: '収入と支出の内訳' },
+          { id: 'm-target', label: '貯金の目標' },
+          { id: 'm-oneoffs', label: 'ボーナス・臨時' },
+          { id: 'm-projection', label: '将来の残高' },
+          { id: 'm-rate', label: '利回り' },
+        ]}
+      />
+      <section className="panel panel-hero anchor" id="m-flow" aria-label="毎月のお金の流れ">
         <p className="hero-label">月間収支（収入 − 固定費 − 変動費）</p>
         <p className={`hero-num ${m.surplus < 0 ? 'is-bad' : ''}`}>
           {m.surplus < 0 && <Icon name="alert" size={28} />}
@@ -87,46 +99,20 @@ export function MoneyTab({ scenario, edit }: { scenario: Scenario; edit: EditSce
           <div className="callout callout-warn">
             <Icon name="alert" size={18} />
             <p>
-              目標の費用が、貯金後の残りを月 <strong>{fmtYen(f.budgetShortageMonthly)}</strong> 超えています。「目標」タブで内訳を確認できます。
+              目標の費用が、貯金後の残りを月 <strong>{fmtYen(f.budgetShortageMonthly)}</strong> 超えています。上の「目標」で内訳を確認できます。
             </p>
           </div>
         )}
       </section>
 
-      <section className="stack-m" aria-label="毎月の収支">
+      <section className="stack-m anchor" id="m-breakdown" aria-label="毎月の収支">
         <BreakdownEditor kind="income" fin={fin} onChange={setFin} color={MONEY_COLORS.savings} compactMoney={compact} hint="税金・社会保険料が引かれた後の、毎月使えるお金" />
         <BreakdownEditor kind="fixed" fin={fin} onChange={setFin} color={MONEY_COLORS.fixed} compactMoney={compact} hint="家賃・光熱費・保険など、毎月ほぼ同じ支出" />
         <BreakdownEditor kind="variable" fin={fin} onChange={setFin} color={MONEY_COLORS.variable} compactMoney={compact} hint="食費・日用品・交際費など、月によって変わる支出" />
         <BreakdownEditor kind="savings" fin={fin} onChange={setFin} color={MONEY_COLORS.savings} compactMoney={compact} hint="預金・つみたてNISA・iDeCo など、毎月貯める・積み立てるお金。お金の目標はここから積み立てる計算です" />
       </section>
 
-      <section className="panel" aria-label="将来の貯金残高">
-        <div className="panel-head">
-          <h2 className="section-title">将来の貯金残高</h2>
-          <Segmented small label="表示する期間" options={HORIZONS.map((h) => ({ ...h }))} value={horizon} onChange={setHorizon} />
-        </div>
-        <ProjectionChart
-          series={[
-            { id: 'main', label: scenario.name, values: p.points.map((x) => ({ ym: x.ym, v: x.balance })), color: 'var(--c-sleep)' },
-            ...(ghost ? [{ id: 'ghost', label: '現在の計画', values: ghost.points.map((x) => ({ ym: x.ym, v: x.balance })), color: 'var(--ink-3)', ghost: true }] : []),
-          ]}
-          target={p.target}
-          deadline={rf.targetMonth || null}
-        />
-        {ghost && <Legend items={[{ label: scenario.name, color: 'var(--c-sleep)', kind: 'line' }, { label: '現在の計画', color: 'var(--ink-3)', kind: 'line' }]} />}
-        {p.target > 0 && mode === 'auto' && <p className="small muted">目標の線は、お金の目標から自動で計算した貯金の目標額（{fmtYen(p.target, compact)}）です。</p>}
-        <p className="fineprint">
-          入力した収支が毎月変わらず続くと仮定した計算値です{fin.annualReturnRate > 0 ? `（年利 ${fin.annualReturnRate}% を仮定）` : '（運用益は含めていません）'}。将来の残高を保証するものではありません。
-        </p>
-        <dl className="stats">
-          <Stat label="現在の貯金額" value={fmtYen(fin.currentSavings, compact)} />
-          <Stat label="毎月の積立" value={fmtYen(p.monthlyContribution, compact, true)} tone={p.monthlyContribution < 0 ? 'bad' : undefined} />
-          <Stat label={`${months / 12}年後の残高`} value={fmtYen(p.points[p.points.length - 1]?.balance ?? 0, compact)} sub={`${fmtMonth(p.points[p.points.length - 1]?.ym ?? '')}末`} />
-          <Stat label="年間の貯金の増加" value={fmtYen(m.annualSavings, compact, true)} />
-        </dl>
-      </section>
-
-      <section className="panel" aria-label="貯金の目標">
+      <section className="panel anchor" id="m-target" aria-label="貯金の目標">
         <h2 className="section-title">貯金の目標</h2>
         <div className="stack-m">
           <NumberField label="現在の貯金額" value={fin.currentSavings} onChange={(v) => setFin({ currentSavings: v })} min={-1e10} max={1e11} step={10000} unit="円" slider={{ min: 0, max: 10000000, step: 10000 }} hint="預金・NISA などの合計" />
@@ -208,9 +194,9 @@ export function MoneyTab({ scenario, edit }: { scenario: Scenario; edit: EditSce
       </section>
       <NewGoalSheet open={addingGoal} onClose={() => setAddingGoal(false)} scenarioId={scenario.id} initialKind="money" />
 
-      <section className="panel" aria-label="臨時収入・臨時支出">
+      <section className="panel anchor" id="m-oneoffs" aria-label="ボーナス・臨時収入・臨時支出">
         <div className="panel-head">
-          <h2 className="section-title">臨時収入・臨時支出</h2>
+          <h2 className="section-title">ボーナス・臨時収入・臨時支出</h2>
           <button
             type="button"
             className="btn btn-small btn-ghost"
@@ -220,7 +206,7 @@ export function MoneyTab({ scenario, edit }: { scenario: Scenario; edit: EditSce
           </button>
         </div>
         {fin.oneOffs.length === 0 ? (
-          <p className="muted small">ボーナスや旅行など、毎月ではないお金の出入りを登録すると、将来の残高に反映されます。</p>
+          <p className="muted small">ボーナスや旅行など、毎月ではないお金の出入りを登録すると、将来の残高と、お金の目標の計算に反映されます。</p>
         ) : (
           <ul className="list">
             {[...fin.oneOffs]
@@ -244,6 +230,33 @@ export function MoneyTab({ scenario, edit }: { scenario: Scenario; edit: EditSce
         )}
       </section>
 
+      <section className="panel anchor" id="m-projection" aria-label="将来の貯金残高">
+        <div className="panel-head">
+          <h2 className="section-title">将来の貯金残高</h2>
+          <Segmented small label="表示する期間" options={HORIZONS.map((h) => ({ ...h }))} value={horizon} onChange={setHorizon} />
+        </div>
+        <ProjectionChart
+          series={[
+            { id: 'main', label: scenario.name, values: p.points.map((x) => ({ ym: x.ym, v: x.balance })), color: 'var(--c-sleep)' },
+            ...(ghost ? [{ id: 'ghost', label: '現在の計画', values: ghost.points.map((x) => ({ ym: x.ym, v: x.balance })), color: 'var(--ink-3)', ghost: true }] : []),
+          ]}
+          target={p.target}
+          deadline={rf.targetMonth || null}
+        />
+        {ghost && <Legend items={[{ label: scenario.name, color: 'var(--c-sleep)', kind: 'line' }, { label: '現在の計画', color: 'var(--ink-3)', kind: 'line' }]} />}
+        {p.target > 0 && mode === 'auto' && <p className="small muted">目標の線は、お金の目標から自動で計算した貯金の目標額（{fmtYen(p.target, compact)}）です。</p>}
+        <p className="fineprint">
+          入力した収支が毎月変わらず続くと仮定した計算値です{fin.annualReturnRate > 0 ? `（年利 ${fin.annualReturnRate}% を仮定）` : '（運用益は含めていません）'}。将来の残高を保証するものではありません。
+        </p>
+        <dl className="stats">
+          <Stat label="現在の貯金額" value={fmtYen(fin.currentSavings, compact)} />
+          <Stat label="毎月の積立" value={fmtYen(p.monthlyContribution, compact, true)} tone={p.monthlyContribution < 0 ? 'bad' : undefined} />
+          <Stat label={`${months / 12}年後の残高`} value={fmtYen(p.points[p.points.length - 1]?.balance ?? 0, compact)} sub={`${fmtMonth(p.points[p.points.length - 1]?.ym ?? '')}末`} />
+          <Stat label="年間の貯金の増加" value={fmtYen(m.annualSavings, compact, true)} />
+        </dl>
+      </section>
+
+      <div className="anchor" id="m-rate">
       <Disclosure summary="想定利回り（任意）">
         <NumberField
           label="想定年利"
@@ -257,6 +270,7 @@ export function MoneyTab({ scenario, edit }: { scenario: Scenario; edit: EditSce
           hint="初期値は 0% です。入力した値は仮定であり、利回りを保証するものではありません。月利 = 年利 ÷ 12 の複利で計算します。"
         />
       </Disclosure>
+      </div>
 
       <OneOffSheet
         item={ooEdit}
@@ -418,7 +432,7 @@ function AutoTargetPanel({
         </div>
       ) : null}
       <p className="fineprint">
-        計算のしかた: まず、目標日までに入るボーナスのうち「貯金に回す割合」の分を、優先順位の高い目標から順に、早く入るボーナスから使います（同じボーナスを二重には数えません）。残りの額を、今月から目標日の月までの月数で割ったものが「毎月貯める額」です。今月に入るボーナスも数えます。お金の目標は「目標」タブで追加・編集できます。
+        計算のしかた: まず、目標日までに入るボーナスのうち「貯金に回す割合」の分を、優先順位の高い目標から順に、早く入るボーナスから使います（同じボーナスを二重には数えません）。残りの額を、今月から目標日の月までの月数で割ったものが「毎月貯める額」です。今月に入るボーナスも数えます。お金の目標は、上の「目標」で追加・編集できます。
       </p>
     </div>
   );

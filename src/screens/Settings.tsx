@@ -7,6 +7,7 @@ import { ConfirmSheet, SectionHead, Segmented, Sheet, TextField, Toggle } from '
 import { Icon } from '../ui/Icon';
 import { OnboardingSheet } from '../ui/Onboarding';
 import { ScreenHead } from '../ui/ScreenHead';
+import { SectionNav } from '../ui/SectionNav';
 
 export function SettingsScreen() {
   const { data, update, today, importData, clearAll, addSample, removeSample, pushToast } = useStore();
@@ -62,11 +63,23 @@ export function SettingsScreen() {
     <>
       <ScreenHead place="settings" eyebrow="世界の調律" title="設定とデータ">
         <a className="back-link" href="#/home">
-          <Icon name="chevron-left" size={16} /> 世界の中心へ戻る
+          <Icon name="chevron-left" size={16} /> ホームへ戻る
         </a>
       </ScreenHead>
+      <SectionNav
+        label="設定のページの目次"
+        items={[
+          { id: 'set-profile', label: 'あなたの情報' },
+          { id: 'set-display', label: '表示' },
+          { id: 'set-backup', label: 'バックアップ' },
+          { id: 'set-sample', label: 'サンプル' },
+          { id: 'set-storage', label: '保存場所' },
+          { id: 'set-about', label: 'このアプリ' },
+          { id: 'set-danger', label: '全削除' },
+        ]}
+      />
 
-      <section className="section">
+      <section className="section anchor" id="set-profile">
         <SectionHead title="あなたの情報" />
         <div className="panel stack-m">
           <TextField label="呼び名" value={data.profile.name} onChange={(name) => update((d) => ({ ...d, profile: { ...d.profile, name } }), { debounce: true })} maxLength={20} placeholder="未設定" />
@@ -76,7 +89,7 @@ export function SettingsScreen() {
         </div>
       </section>
 
-      <section className="section">
+      <section className="section anchor" id="set-display">
         <SectionHead title="表示" />
         <div className="panel stack-m">
           <div className="field">
@@ -122,7 +135,7 @@ export function SettingsScreen() {
         </div>
       </section>
 
-      <section className="section">
+      <section className="section anchor" id="set-backup">
         <SectionHead title="バックアップ" sub="機種変更やブラウザのデータ削除に備えて、定期的に書き出してください" />
         <div className="panel stack-s">
           <button type="button" className="settings-row" onClick={doExport}>
@@ -143,7 +156,7 @@ export function SettingsScreen() {
         </div>
       </section>
 
-      <section className="section">
+      <section className="section anchor" id="set-sample">
         <SectionHead title="サンプルデータ" />
         <div className="panel stack-s">
           <button type="button" className="settings-row" onClick={addSample} disabled={data.goals.some((g) => g.id === 's-cert')}>
@@ -163,7 +176,7 @@ export function SettingsScreen() {
         </div>
       </section>
 
-      <section className="section">
+      <section className="section anchor" id="set-storage">
         <SectionHead title="データの保存場所" />
         <div className="panel prose">
           <p>
@@ -181,7 +194,7 @@ export function SettingsScreen() {
         </div>
       </section>
 
-      <section className="section">
+      <section className="section anchor" id="set-about">
         <SectionHead title="LIFE ENGINE について" />
         <div className="panel prose">
           <p>時間・お金・目標をひとつの計画として計算し、選択肢を比べるためのアプリです。AI や外部APIは一切使わず、すべての結果は下の決まった式で計算します。同じ入力なら必ず同じ結果になります。</p>
@@ -206,7 +219,7 @@ export function SettingsScreen() {
         </div>
       </section>
 
-      <section className="section">
+      <section className="section anchor" id="set-danger">
         <SectionHead title="危険な操作" />
         <div className="panel">
           <button type="button" className="settings-row settings-row-danger" onClick={() => setConfirmClear(true)}>

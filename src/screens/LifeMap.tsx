@@ -9,7 +9,7 @@ import { fmtDate, fmtH, fmtYen } from '../ui/format';
 import { Icon, DOMAIN_ICONS } from '../ui/Icon';
 import { NewGoalSheet, deleteGoal } from '../ui/GoalEditor';
 import { useScenarioModel } from '../ui/model';
-import { navigate } from '../ui/router';
+import { navigate, useRoute } from '../ui/router';
 import { ScreenHead } from '../ui/ScreenHead';
 import { useWidth } from '../ui/viz';
 
@@ -98,7 +98,11 @@ export function LifeMapScreen() {
   const [newGoalDomain, setNewGoalDomain] = useState<string | null | undefined>(undefined);
   const [confirmDelete, setConfirmDelete] = useState<NodeRef | null>(null);
   const [depAdd, setDepAdd] = useState(false);
-  const [view, setView] = useState<'map' | 'graph'>('map');
+  const route = useRoute();
+  const viewParam = route.params.get('view') === 'graph' ? 'graph' : 'map';
+  const [view, setView] = useState<'map' | 'graph'>(viewParam);
+  // 案内（さがす）から「つながり図」を開いたときも切りかえる
+  useEffect(() => setView(viewParam), [viewParam]);
   const { state: world } = useWorld();
 
   const nameOf = (r: NodeRef) => nodeMap.get(keyOf(r))?.label ?? '（削除済み）';
@@ -155,7 +159,7 @@ export function LifeMapScreen() {
 
   return (
     <>
-      <ScreenHead place="map" eyebrow="世界地図" title="あなたの世界の地図">
+      <ScreenHead place="map" eyebrow="世界地図" title="人生の地図">
         <p className="screen-lead">人生の領域を、ひとつの地図として眺めます。場所を押すと、その領域の開拓計画・記録・つながりを確認できます。</p>
         <div className="sim-tabs">
           <Segmented

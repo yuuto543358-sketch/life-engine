@@ -60,7 +60,7 @@ export function TimeTab({ scenario, edit }: { scenario: Scenario; edit: EditScen
           <div className="callout callout-warn">
             <Icon name="alert" size={18} />
             <p>
-              目標に必要な時間が週 <strong>{fmtHours(f.timeShortage - t.shortageHours)}</strong> 足りません。「目標」タブで内訳を確認できます。
+              目標に必要な時間が週 <strong>{fmtHours(f.timeShortage - t.shortageHours)}</strong> 足りません。上の「目標」で内訳を確認できます。
             </p>
           </div>
         )}

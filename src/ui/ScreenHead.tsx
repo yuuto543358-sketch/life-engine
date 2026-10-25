@@ -3,6 +3,7 @@ import { useStore } from '../data/store';
 import { Icon } from './Icon';
 import { LivingWorld } from '../paint/world/LivingWorld';
 import { useWorld } from '../world/useWorld';
+import { TopActions } from './GuideSheet';
 
 /** それぞれの場所から見える、世界の一部分（世界の座標と、見える横幅） */
 export const PLACE_VIEWS = {
@@ -27,6 +28,7 @@ export function ScreenHead({ eyebrow, title, children, place }: { eyebrow?: Reac
   return (
     <header className={`screen-head${place ? ' has-banner' : ''}`}>
       {place && <PlaceBanner view={PLACE_VIEWS[place]} />}
+      <TopActions settings={place !== 'settings'} tone={place ? 'glass' : 'plain'} />
       <div className="screen-head-row">
         <div>
           {eyebrow && <p className="eyebrow">{eyebrow}</p>}

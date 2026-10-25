@@ -20,6 +20,7 @@ import { ConfirmSheet, Empty, NumberField, SectionHead, Segmented, SelectField, 
 import { fmtDate, fmtH, fmtHours, fmtNum, fmtPct, fmtShortDate, fmtYen, weekdayOf } from '../ui/format';
 import { Icon } from '../ui/Icon';
 import { ScreenHead } from '../ui/ScreenHead';
+import { SectionNav } from '../ui/SectionNav';
 import { CAT_COLOR, PeriodBars } from '../ui/viz';
 import { DevRow, MONEY_COLORS, describeRecord } from '../ui/recordViews';
 
@@ -68,7 +69,16 @@ export function ActualsScreen({ embedded }: { embedded?: boolean } = {}) {
   return (
     <>
       {embedded ? (
-        <p className="screen-lead">足跡（実際に使った時間とお金）を残すと、計画とのずれが観測できます。</p>
+        <SectionNav
+          label="予定と実績のページの目次"
+          items={[
+            { id: 'o-diff', label: '計画との差' },
+            { id: 'o-goals', label: '目標ごと' },
+            { id: 'o-accuracy', label: '見積もりの精度' },
+            { id: 'o-trend', label: '週ごとの推移' },
+            { id: 'o-list', label: '記録の一覧' },
+          ]}
+        />
       ) : (
         <ScreenHead eyebrow="世界の観測" title="計画と現実の差">
           <p className="screen-lead">実際に使った時間とお金を記録すると、計画とのずれが見えてきます。</p>
@@ -118,7 +128,7 @@ export function ActualsScreen({ embedded }: { embedded?: boolean } = {}) {
         </Empty>
       ) : (
         <>
-          <section className="section">
+          <section className="section anchor" id="o-diff">
             <SectionHead title="計画との差" sub={`計画値は現在の計画を${kind === 'day' ? '1日' : kind === 'week' ? '1週' : '1か月'}あたりに換算`} />
             <div className="panel stack-m">
               {timeRows.map((r) => (
@@ -137,7 +147,7 @@ export function ActualsScreen({ embedded }: { embedded?: boolean } = {}) {
           </section>
 
           {goalRows.length > 0 && (
-            <section className="section">
+            <section className="section anchor" id="o-goals">
               <SectionHead title="目標ごとの実績" />
               <ul className="list">
                 {goalRows.map((g) => (
@@ -157,7 +167,7 @@ export function ActualsScreen({ embedded }: { embedded?: boolean } = {}) {
         </>
       )}
 
-      <section className="section">
+      <section className="section anchor" id="o-accuracy">
         <SectionHead title="見積もりの精度" sub="作業の記録（見積もり時間と実際の時間）から計算" />
         {allTasks.count === 0 ? (
           <p className="muted small">「作業を記録」で見積もりと実際の時間を入れると、見積もりがどの程度ずれやすいかを表示します。</p>
@@ -203,7 +213,7 @@ export function ActualsScreen({ embedded }: { embedded?: boolean } = {}) {
         )}
       </section>
 
-      <section className="section">
+      <section className="section anchor" id="o-trend">
         <SectionHead title="週ごとの推移" sub="直近8週の記録の合計" />
         <div className="panel">
           <div className="chips chips-scroll">
@@ -225,7 +235,7 @@ export function ActualsScreen({ embedded }: { embedded?: boolean } = {}) {
         </div>
       </section>
 
-      <section className="section">
+      <section className="section anchor" id="o-list">
         <SectionHead title="この期間の記録" sub={`${inPeriod.length}件`} />
         {inPeriod.length === 0 ? (
           <p className="muted small">記録はありません。</p>

@@ -16,9 +16,9 @@ import { CompareTab } from './sim/CompareTab';
 type SimTab = 'time' | 'money' | 'goals' | 'compare';
 const SIM_TABS: { value: SimTab; label: string }[] = [
   { value: 'time', label: '時間' },
-  { value: 'money', label: '蓄え・お金' },
-  { value: 'goals', label: '開拓計画' },
-  { value: 'compare', label: '比較' },
+  { value: 'money', label: 'お金' },
+  { value: 'goals', label: '目標' },
+  { value: 'compare', label: '比べる' },
 ];
 
 export type EditScenario = (fn: (s: Scenario) => Scenario) => void;
@@ -39,7 +39,8 @@ export function SimulatorScreen({ route }: { route: Route }) {
 
   return (
     <>
-      <ScreenHead place="sim" eyebrow="開拓の間 · 計画とシミュレーション" title="これからの道筋を試す">
+      <ScreenHead place="sim" eyebrow="開拓の間" title="計画">
+        <p className="screen-lead">1週間の時間・毎月のお金・目標を入れて、計画が成り立つかを確かめる場所です。</p>
         <button type="button" className="scenario-switch" onClick={() => setPicker(true)} aria-haspopup="dialog">
           <span className="scenario-switch-label">編集中のシナリオ</span>
           <span className="scenario-switch-name">

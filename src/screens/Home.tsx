@@ -12,6 +12,7 @@ import { describeRecord } from '../ui/recordViews';
 import { ChronicleEditor, newChronicle } from '../ui/ChronicleEditor';
 import { RecordEditor, newRecord } from './Actuals';
 import { LivingWorld } from '../paint/world/LivingWorld';
+import { TopActions } from '../ui/GuideSheet';
 import { motion, useScroll, useTransform } from 'motion/react';
 import { useWorld } from '../world/useWorld';
 import { computeWorld } from '../engine/world';
@@ -118,9 +119,7 @@ export function HomeScreen() {
                 <Icon name="alert" size={14} /> 未保存
               </span>
             )}
-            <a className="wc-icon" href={href('settings')} aria-label="世界の調律（設定）">
-              <Icon name="settings" size={20} />
-            </a>
+            <TopActions />
           </div>
         </div>
         <p className="wc-caption">{era.meaning}</p>
@@ -175,13 +174,13 @@ function TodayFootprints({ onAdd, onJournal, onEdit }: { onAdd: (t: ActualRecord
   const notes = data.chronicle.filter((c) => c.date === today);
   const goalName = (id: string | null) => (id ? data.goals.find((g) => g.id === id)?.name ?? null : null);
   return (
-    <section className="wc-section" aria-label="今日の足跡">
+    <section className="wc-section anchor" id="h-today" aria-label="今日の足跡">
       <div className="wc-head">
         <h2 className="wc-title">
-          <Icon name="lantern" size={18} /> 今日の足跡
+          <Icon name="lantern" size={18} /> 今日の足跡 <span className="wc-real">（今日の記録）</span>
         </h2>
         <a className="section-link" href={href('log')}>
-          年代記へ <Icon name="chevron" size={14} />
+          記録へ <Icon name="chevron" size={14} />
         </a>
       </div>
       <div className="quick-add" role="group" aria-label="足跡（記録）を残す">
@@ -236,7 +235,7 @@ function NextSteps({ input }: { input: ReturnType<typeof useWorld>['input'] }) {
   const steps = useMemo(() => nextSteps(input, today, feasibility.conflicts), [input, today, feasibility.conflicts]);
   if (steps.length === 0) return null;
   return (
-    <section className="wc-section" aria-label="次の一歩">
+    <section className="wc-section anchor" id="h-next" aria-label="次の一歩">
       <h2 className="wc-title">
         <Icon name="compass" size={18} /> 次の一歩
       </h2>
@@ -261,13 +260,13 @@ function ActivePlans() {
   const active = f.goals.filter((g) => !g.completed).slice(0, 3);
   const goalById = new Map(data.goals.map((g) => [g.id, g]));
   return (
-    <section className="wc-section" aria-label="進行中の開拓計画">
+    <section className="wc-section anchor" id="h-plans" aria-label="進行中の開拓計画">
       <div className="wc-head">
         <h2 className="wc-title">
           <Icon name="flag" size={18} /> 進行中の開拓計画 <span className="wc-real">（目標）</span>
         </h2>
         <a className="section-link" href={href('sim', 'goals')}>
-          開拓の間 <Icon name="chevron" size={14} />
+          計画へ <Icon name="chevron" size={14} />
         </a>
       </div>
       {active.length === 0 ? (
@@ -300,7 +299,7 @@ function ActivePlans() {
 
 export function RecentChanges({ events, title = '最近の世界の変化' }: { events: ReturnType<typeof recentEvents>; title?: string }) {
   return (
-    <section className="wc-section" aria-label={title}>
+    <section className="wc-section anchor" id="h-changes" aria-label={title}>
       <h2 className="wc-title">
         <Icon name="sprout" size={18} /> {title}
       </h2>
@@ -329,7 +328,7 @@ export function RecentChanges({ events, title = '最近の世界の変化' }: { 
 
 function WorldStatus({ state, onSelect }: { state: ReturnType<typeof useWorld>['state']; onSelect: (s: WorldStructure) => void }) {
   return (
-    <section className="wc-section" aria-label="世界のようす">
+    <section className="wc-section anchor" id="h-status" aria-label="世界のようす">
       <details className="disclosure world-status">
         <summary>
           <span>
@@ -399,9 +398,9 @@ function Balance() {
   const { feasibility: f, projection: p } = useScenarioModel(current);
   const free = Math.max(0, f.time.freeHours) - f.freeUsedByGoals;
   return (
-    <section className="wc-section" aria-label="暮らしの釣り合い">
+    <section className="wc-section anchor" id="h-balance" aria-label="暮らしの釣り合い">
       <h2 className="wc-title">
-        <Icon name="scroll" size={18} /> 暮らしの釣り合い
+        <Icon name="scroll" size={18} /> 暮らしの釣り合い <span className="wc-real">（時間とお金）</span>
       </h2>
       <div className="balance">
         <a className="balance-cell" href={href('sim', 'time')}>

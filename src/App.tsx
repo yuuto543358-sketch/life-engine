@@ -9,14 +9,16 @@ import { LifeMapScreen } from './screens/LifeMap';
 import { ChronicleScreen } from './screens/Chronicle';
 import { SettingsScreen } from './screens/Settings';
 import { QuietScreen } from './screens/Quiet';
+import { GuideSheet } from './ui/GuideSheet';
 
 /** 世界の5つの場所。設定（世界の調律）は世界の中心の右上から開く */
-const TAB_ITEMS: { key: TabKey; label: string; icon: string }[] = [
-  { key: 'home', label: '世界の中心', icon: 'center' },
-  { key: 'map', label: '世界地図', icon: 'map' },
-  { key: 'sim', label: '開拓の間', icon: 'compass' },
-  { key: 'log', label: '年代記', icon: 'hall' },
-  { key: 'quiet', label: '静寂の地', icon: 'moon' },
+/** タブの名前は「何をする場所か」が分かる言葉にし、世界での名前は読み上げと各画面の見出しで伝える */
+const TAB_ITEMS: { key: TabKey; label: string; world: string; icon: string }[] = [
+  { key: 'home', label: 'ホーム', world: '世界の中心', icon: 'center' },
+  { key: 'map', label: '地図', world: '世界地図', icon: 'map' },
+  { key: 'sim', label: '計画', world: '開拓の間', icon: 'compass' },
+  { key: 'log', label: '記録', world: '年代記の館', icon: 'hall' },
+  { key: 'quiet', label: '休む', world: '静寂の地', icon: 'moon' },
 ];
 
 export function App() {
@@ -45,6 +47,11 @@ export function App() {
     mq.addEventListener('change', apply);
     return () => mq.removeEventListener('change', apply);
   }, [theme, motionSetting, textSize]);
+
+  // 別の場所（タブ）へ移ったら、いちばん上から見せる
+  useEffect(() => {
+    window.scrollTo({ top: 0 });
+  }, [route.tab, route.sub]);
 
   let screen: ReactNode;
   switch (route.tab) {
@@ -78,7 +85,7 @@ export function App() {
             {TAB_ITEMS.map((t) => {
               const active = route.tab === t.key || (t.key === 'home' && route.tab === 'settings');
               return (
-                <a key={t.key} href={href(t.key)} className="tab" aria-current={active ? 'page' : undefined}>
+                <a key={t.key} href={href(t.key)} className="tab" aria-current={active ? 'page' : undefined} aria-label={`${t.label}（${t.world}）`}>
                   {active && <motion.span layoutId="tab-pill" className="tab-pill" transition={{ type: 'spring', stiffness: 520, damping: 40, mass: 0.9 }} />}
                   <motion.span className="tab-icon" animate={active ? { y: -1, scale: 1.08 } : { y: 0, scale: 1 }} transition={{ type: 'spring', stiffness: 600, damping: 22 }}>
                     <Icon name={t.icon} size={22} stroke={active ? 2 : 1.6} />
@@ -90,6 +97,7 @@ export function App() {
           </div>
         </nav>
         <Toasts />
+        <GuideSheet />
       </div>
     </MotionConfig>
   );
