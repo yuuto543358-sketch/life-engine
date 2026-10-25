@@ -28,50 +28,6 @@ export function useWidth<T extends HTMLElement>(): [React.RefObject<T | null>, n
   return [ref, w];
 }
 
-type CellKind = TimeCategoryKey | 'free' | 'goal' | 'over' | 'outside';
-
-/**
- * 1週間 = 168マス（1マス = 1時間）で時間配分を見せる。
- * 小数の時間は累積値を四捨五入してマスに割り当てる（正確な値は凡例・数値で表示する）。
- */
-export function HourGrid({ items, totalHours, goalFreeHours = 0, compact }: { items: { key: TimeCategoryKey; weeklyHours: number }[]; totalHours: number; goalFreeHours?: number; compact?: boolean }) {
-  const cells = useMemo(() => {
-    const out: CellKind[] = [];
-    let cum = 0;
-    for (const it of items) {
-      const startCell = Math.round(cum);
-      cum += it.weeklyHours;
-      const endCell = Math.round(cum);
-      for (let i = startCell; i < endCell; i++) out.push(it.key);
-    }
-    const allocated = out.length;
-    const total = Math.round(totalHours);
-    if (allocated <= total) {
-      const goalCells = Math.min(total - allocated, Math.round(goalFreeHours));
-      for (let i = 0; i < goalCells; i++) out.push('goal');
-      while (out.length < total) out.push('free');
-      while (out.length < 168) out.push('outside');
-    } else {
-      // 総時間を超えた分は「不足」として赤で示す
-      for (let i = total; i < allocated; i++) out[i] = 'over';
-      while (out.length % 24 !== 0) out.push('outside');
-    }
-    return out;
-  }, [items, totalHours, goalFreeHours]);
-
-  const allocated = items.reduce((s, i) => s + i.weeklyHours, 0);
-  const free = totalHours - allocated;
-  const label = `1週間${totalHours}時間のうち、配分済み${fmtH(allocated)}時間、${free >= 0 ? `自由時間${fmtH(free)}時間` : `${fmtH(-free)}時間不足`}`;
-
-  return (
-    <div className={`hourgrid${compact ? ' hourgrid-compact' : ''}`} role="img" aria-label={label}>
-      {cells.map((c, i) => (
-        <span key={i} className={`hg-cell hg-${c}`} style={c in CAT_COLOR && c !== 'free' ? { background: CAT_COLOR[c as TimeCategoryKey] } : undefined} />
-      ))}
-    </div>
-  );
-}
-
 export function TimeLegend({ items, freeHours, goalFreeHours }: { items: { key: TimeCategoryKey; weeklyHours: number }[]; freeHours: number; goalFreeHours?: number }) {
   return (
     <ul className="legend">
@@ -332,4 +288,143 @@ export function Bullet({ planned, actual, color }: { planned: number; actual: nu
 
 export function timeItemsOrdered<T extends { key: TimeCategoryKey }>(items: T[]): T[] {
   return TIME_CATEGORY_KEYS.map((k) => items.find((i) => i.key === k)!).filter(Boolean);
+}
+
+/** 数値の配列をなめらかに変化させる（動きを抑える設定では即座に切り替える） */
+function useTweened(target: number[], dur = 320): number[] {
+  const [vals, setVals] = useState(target);
+  const from = useRef(target);
+  const raf = useRef(0);
+  const key = target.join(',');
+  useEffect(() => {
+    cancelAnimationFrame(raf.current);
+    const reduced = document.documentElement.dataset.reduced === 'true';
+    const start = from.current;
+    if (reduced || start.length !== target.length) {
+      from.current = target;
+      setVals(target);
+      return;
+    }
+    const t0 = performance.now();
+    const tick = (t: number) => {
+      const k = Math.min(1, (t - t0) / dur);
+      const e = 1 - (1 - k) ** 3;
+      const v = target.map((x, i) => start[i] + (x - start[i]) * e);
+      from.current = v;
+      setVals(v);
+      if (k < 1) raf.current = requestAnimationFrame(tick);
+    };
+    raf.current = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf.current);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [key]);
+  return vals;
+}
+
+function arcPath(cx: number, cy: number, r0: number, r1: number, a0: number, a1: number): string {
+  const span = a1 - a0;
+  if (span <= 0) return '';
+  if (span >= Math.PI * 2 - 1e-6) {
+    // 全周: 2つの半円で描く
+    const m = a0 + Math.PI;
+    return arcPath(cx, cy, r0, r1, a0, m) + arcPath(cx, cy, r0, r1, m, a0 + Math.PI * 2 - 1e-6);
+  }
+  const p = (r: number, a: number) => `${(cx + r * Math.cos(a)).toFixed(2)},${(cy + r * Math.sin(a)).toFixed(2)}`;
+  const large = span > Math.PI ? 1 : 0;
+  return `M${p(r1, a0)}A${r1},${r1} 0 ${large} 1 ${p(r1, a1)}L${p(r0, a1)}A${r0},${r0} 0 ${large} 0 ${p(r0, a0)}Z`;
+}
+
+interface DonutSeg {
+  key: string;
+  label: string;
+  hours: number;
+  color: string;
+  kind: 'cat' | 'goal' | 'free';
+}
+
+/**
+ * 1週間の時間配分のドーナツグラフ。
+ * 角度は「時間 ÷ 1週間の総時間」。配分が総時間を超える場合は全体を配分の合計で描き、超えた分を外側の赤い線で示す。
+ * 切れ目を押すと、真ん中にその項目の時間と割合を表示する。
+ */
+export function TimeDonut({ items, totalHours, goalFreeHours = 0, size = 220, compact }: { items: { key: TimeCategoryKey; weeklyHours: number }[]; totalHours: number; goalFreeHours?: number; size?: number; compact?: boolean }) {
+  const [sel, setSel] = useState<string | null>(null);
+  const allocated = items.reduce((s, i) => s + i.weeklyHours, 0);
+  const free = totalHours - allocated;
+  const goalFree = free > 0 ? Math.min(free, Math.max(0, goalFreeHours)) : 0;
+  const segs: DonutSeg[] = [
+    ...TIME_CATEGORY_KEYS.map((k) => ({ key: k, label: TIME_LABELS[k], hours: items.find((i) => i.key === k)?.weeklyHours ?? 0, color: CAT_COLOR[k], kind: 'cat' as const })),
+    { key: 'goal', label: '目標で使う自由時間', hours: goalFree, color: 'var(--c-study)', kind: 'goal' },
+    { key: 'free', label: '自由時間', hours: Math.max(0, free - goalFree), color: 'var(--c-free)', kind: 'free' },
+  ];
+  const tw = useTweened([...segs.map((s) => s.hours), totalHours]);
+  const twTotal = tw[tw.length - 1];
+  const sum = Math.max(twTotal, tw.slice(0, -1).reduce((s, v) => s + v, 0), 1e-9);
+  const c = size / 2;
+  const rOuter = c - 10;
+  const rInner = rOuter * (compact ? 0.6 : 0.64);
+  let angle = -Math.PI / 2;
+  const arcs = segs.map((s, i) => {
+    const a0 = angle;
+    const a1 = angle + (tw[i] / sum) * Math.PI * 2;
+    angle = a1;
+    return { ...s, a0, a1 };
+  });
+  const overStart = -Math.PI / 2 + (Math.min(twTotal, sum) / sum) * Math.PI * 2;
+  const short = allocated - totalHours;
+  const selected = sel ? segs.find((s) => s.key === sel) : null;
+  const label = `1週間${fmtH(totalHours)}時間の配分。${segs
+    .filter((s) => s.hours > 0)
+    .map((s) => `${s.label}${fmtH(s.hours)}時間`)
+    .join('、')}${short > 0 ? `。${fmtH(short)}時間不足` : ''}`;
+
+  return (
+    <div className={`donut${compact ? ' donut-compact' : ''}`} style={{ width: size, height: size }}>
+      <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} role="img" aria-label={label}>
+        {arcs.map((a) =>
+          a.a1 - a.a0 > 0.0005 ? (
+            <path
+              key={a.key}
+              d={arcPath(c, c, rInner, sel === a.key ? rOuter + 5 : rOuter, a.a0, a.a1)}
+              className={`donut-seg donut-${a.kind}${sel && sel !== a.key ? ' is-dim' : ''}`}
+              style={{ fill: a.color }}
+              onClick={() => setSel(sel === a.key ? null : a.key)}
+            />
+          ) : null,
+        )}
+        {short > 0 && <path d={arcPath(c, c, rOuter + 3, rOuter + 8, overStart, Math.PI * 1.5)} className="donut-over" />}
+      </svg>
+      <button type="button" className="donut-center" onClick={() => setSel(null)} aria-live="polite" aria-label={selected ? `${selected.label} ${fmtH(selected.hours)}時間。押すと戻る` : undefined}>
+        {selected ? (
+          <>
+            <span className="donut-c-label">{selected.label}</span>
+            <span className="donut-c-value num">
+              {fmtH(selected.hours)}
+              <span className="donut-c-unit">h/週</span>
+            </span>
+            <span className="donut-c-sub num">
+              {Math.round((selected.hours / Math.max(totalHours, 1)) * 100)}% · 1日 {fmtH(selected.hours / 7)}h
+            </span>
+          </>
+        ) : short > 0 ? (
+          <>
+            <span className="donut-c-label is-bad">不足</span>
+            <span className="donut-c-value num is-bad">
+              {fmtH(short)}
+              <span className="donut-c-unit">h/週</span>
+            </span>
+          </>
+        ) : (
+          <>
+            <span className="donut-c-label">{goalFree > 0 && !compact ? '残る自由時間' : '自由時間'}</span>
+            <span className="donut-c-value num">
+              {fmtH(Math.max(0, free - goalFree))}
+              <span className="donut-c-unit">h/週</span>
+            </span>
+            {!compact && <span className="donut-c-sub num">1日 {fmtH(Math.max(0, free - goalFree) / 7)}h</span>}
+          </>
+        )}
+      </button>
+    </div>
+  );
 }

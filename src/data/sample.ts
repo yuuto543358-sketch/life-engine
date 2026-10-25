@@ -44,8 +44,9 @@ export function buildSample(today: string, now: string): SampleBundle {
     mkGoal('s-cert', '応用情報技術者に合格', 'd-learning', 35, 200, '試験に合格する'),
     mkGoal('s-job', '転職して年収を上げる', 'd-work', 10, 60, '内定を得て入社する'),
     mkGoal('s-run', 'ハーフマラソン完走', 'd-health', 40, 80, '21kmを走りきる'),
-    mkGoal('s-trip', '北海道旅行', 'd-hobby', 0, null, '旅行に行く'),
-    mkGoal('s-move', '職場の近くへ引っ越す', 'd-living', 0, 20, '新居に住み始める'),
+    { ...mkGoal('s-trip', '北海道旅行の資金', 'd-hobby', 20, null, ''), kind: 'money', moneyPurpose: 'buy', savedAmount: 30000 },
+    { ...mkGoal('s-move', '職場の近くへ引っ越す費用', 'd-living', 17, 20, ''), kind: 'money', moneyPurpose: 'buy', savedAmount: 50000 },
+    { ...mkGoal('s-emergency', '生活防衛資金', 'd-money', 60, null, ''), kind: 'money', moneyPurpose: 'save', savedAmount: 600000 },
   ];
 
   const goalPlans: Record<string, GoalPlan> = {
@@ -54,6 +55,7 @@ export function buildSample(today: string, now: string): SampleBundle {
     's-run': { included: true, deadline: `${addMonths(ym, 5)}-15`, weeklyHours: 4, timeSource: 'hobby', budget: 25000, priority: 3 },
     's-trip': { included: true, deadline: `${addMonths(ym, 10)}-28`, weeklyHours: 0, timeSource: 'free', budget: 150000, priority: 4 },
     's-move': { included: true, deadline: `${addMonths(ym, 14)}-28`, weeklyHours: 1, timeSource: 'free', budget: 300000, priority: 5 },
+    's-emergency': { included: true, deadline: `${addMonths(ym, 17)}-28`, weeklyHours: 0, timeSource: 'free', budget: 1000000, priority: 6 },
   };
 
   const time: TimeBudget = {
@@ -73,19 +75,41 @@ export function buildSample(today: string, now: string): SampleBundle {
   const junMonth = +ym.slice(5) <= 6 ? `${ym.slice(0, 4)}-06` : `${+ym.slice(0, 4) + 1}-06`;
   const finance: FinancialProfile = {
     monthlyIncome: 280000,
+    incomeItems: [{ id: 'in-salary', label: '給与（手取り）', amount: 280000 }],
     fixedCosts: 110000,
     fixedItems: [
-      { id: 'fx-rent', label: '家賃・住宅ローン', amount: 68000 },
-      { id: 'fx-utilities', label: '水道光熱費', amount: 12000 },
-      { id: 'fx-phone', label: '通信費（スマホ・ネット）', amount: 8000 },
-      { id: 'fx-insurance', label: '保険', amount: 7000 },
-      { id: 'fx-subscription', label: 'サブスク', amount: 3000 },
-      { id: 'fx-transport', label: '交通費（定期・車など）', amount: 0 },
-      { id: 'fx-loan', label: 'ローン返済', amount: 0 },
-      { id: 'fx-other', label: 'その他の固定費', amount: 12000 },
+      { id: 'fx-rent', label: '家賃', amount: 68000 },
+      { id: 'fx-electric', label: '電気代', amount: 6000 },
+      { id: 'fx-gas', label: 'ガス代', amount: 3500 },
+      { id: 'fx-water', label: '水道代', amount: 2500 },
+      { id: 'fx-phone', label: 'スマホ', amount: 3000 },
+      { id: 'fx-net', label: 'インターネット回線', amount: 5000 },
+      { id: 'fx-medical', label: '医療保険・がん保険', amount: 4000 },
+      { id: 'fx-houseins', label: '火災保険・その他の保険', amount: 1000 },
+      { id: 'fx-transport', label: '定期代', amount: 0 },
+      { id: 'fx-scholarship', label: '奨学金の返済', amount: 12000 },
+      { id: 'fx-subscription', label: '動画・音楽などのサブスク', amount: 2000 },
+      { id: 'fx-membership', label: 'ジム・会費', amount: 3000 },
     ],
     variableCosts: 90000,
+    variableItems: [
+      { id: 'vr-grocery', label: '食料品（自炊）', amount: 35000 },
+      { id: 'vr-eatout', label: '外食', amount: 15000 },
+      { id: 'vr-cafe', label: 'カフェ・おやつ・飲み物', amount: 3000 },
+      { id: 'vr-daily', label: '日用品', amount: 8000 },
+      { id: 'vr-clothes', label: '衣服・靴', amount: 7000 },
+      { id: 'vr-beauty', label: '美容・理容', amount: 4000 },
+      { id: 'vr-medical', label: '医療費・薬', amount: 2000 },
+      { id: 'vr-social', label: '交際費', amount: 8000 },
+      { id: 'vr-hobby', label: '趣味・娯楽', amount: 5000 },
+      { id: 'vr-books', label: '本・学習', amount: 3000 },
+    ],
     monthlySavings: 50000,
+    savingsItems: [
+      { id: 'sv-deposit', label: '預金（普通・定期）', amount: 20000 },
+      { id: 'sv-nisa', label: 'つみたてNISA（つみたて投資枠）', amount: 30000 },
+    ],
+    savingsTargetMode: 'auto',
     currentSavings: 850000,
     savingsTarget: 2000000,
     targetMonth: addMonths(ym, 17),
@@ -179,14 +203,15 @@ export function buildSample(today: string, now: string): SampleBundle {
       s.goalPlans['s-cert'].deadline = `${addMonths(ym, 4)}-20`;
     }),
     mk('s-sc-save', '貯金優先', '変動費を抑えて貯金を増やす。旅行は見送る', (s) => {
-      s.finance.variableCosts = 72000;
-      s.finance.monthlySavings = 75000;
+      // 変動費 90,000 → 72,000円、毎月の貯金 50,000 → 75,000円
+      setAmounts(s.finance, 'variableItems', 'variableCosts', { 'vr-eatout': 5000, 'vr-cafe': 0, 'vr-clothes': 2000 });
+      setAmounts(s.finance, 'savingsItems', 'monthlySavings', { 'sv-deposit': 25000, 'sv-nisa': 50000 });
       s.goalPlans['s-trip'].included = false;
     }),
     mk('s-sc-free', '自由時間優先', '残業を減らして趣味と休息を増やす', (s) => {
       s.time.items.work = { hoursPerDay: 8, daysPerWeek: 5 };
       s.time.items.hobby = { hoursPerDay: 2, daysPerWeek: 7 };
-      s.finance.monthlyIncome = 265000;
+      setAmounts(s.finance, 'incomeItems', 'monthlyIncome', { 'in-salary': 265000 });
       s.goalPlans['s-run'].weeklyHours = 6;
     }),
   ];
@@ -195,3 +220,15 @@ export function buildSample(today: string, now: string): SampleBundle {
 }
 
 export const SAMPLE_GOAL_PREFIX = 's-';
+
+/** 内訳の金額を変えて、合計も計算し直す */
+function setAmounts(
+  fin: FinancialProfile,
+  itemsKey: 'incomeItems' | 'fixedItems' | 'variableItems' | 'savingsItems',
+  totalKey: 'monthlyIncome' | 'fixedCosts' | 'variableCosts' | 'monthlySavings',
+  amounts: Record<string, number>,
+) {
+  const items = (fin[itemsKey] ?? []).map((i) => (i.id in amounts ? { ...i, amount: amounts[i.id] } : i));
+  fin[itemsKey] = items;
+  fin[totalKey] = items.reduce((sum, i) => sum + i.amount, 0);
+}

@@ -47,34 +47,50 @@ export interface OneOffItem {
   repeatYearly: boolean;
 }
 
-/** 固定費の内訳の1項目 */
-export interface FixedCostItem {
+/** お金の内訳の種類（収入・固定費・変動費・毎月の貯金や積立） */
+export type BreakdownKind = 'income' | 'fixed' | 'variable' | 'savings';
+
+/** お金の内訳の1項目（円/月） */
+export interface MoneyItem {
   id: string;
-  /** 項目名（例: 家賃） */
+  /** 項目名（例: 家賃、つみたてNISA） */
   label: string;
   /** 金額（円/月） */
   amount: number;
+  /** 表示上のグループ（例: 住まい、保険）。未設定なら項目IDから決める */
+  group?: string;
 }
 
+/** 以前の名前（互換のため残す） */
+export type FixedCostItem = MoneyItem;
+
+/**
+ * お金の計画。合計の値（monthlyIncome など）は、内訳（〜Items）がある場合は常に内訳の合計と同じ値にする。
+ * 計算では breakdownTotal() を使い、内訳を優先する。内訳がない古いデータは合計の値をそのまま使う。
+ */
 export interface FinancialProfile {
   /** 月の手取り収入（円/月） */
   monthlyIncome: number;
-  /**
-   * 固定費の合計（円/月）。内訳（fixedItems）がある場合は常に内訳の合計と同じ値にする。
-   * 計算では fixedTotal() を使い、内訳を優先する。
-   */
+  incomeItems?: MoneyItem[];
+  /** 固定費（円/月）家賃・通信費・保険など */
   fixedCosts: number;
-  /** 固定費の内訳。未設定（古いデータ）の場合は fixedCosts をそのまま使う */
-  fixedItems?: FixedCostItem[];
+  fixedItems?: MoneyItem[];
   /** 変動費（円/月）食費・日用品・交際費など */
   variableCosts: number;
-  /** 毎月の貯金額（円/月）。収支の余りから貯金に回す予定額 */
+  variableItems?: MoneyItem[];
+  /** 毎月の貯金・積立額（円/月）。預金・つみたてNISA・iDeCo など */
   monthlySavings: number;
+  savingsItems?: MoneyItem[];
   /** 現在の貯金額（円） */
   currentSavings: number;
-  /** 貯金の目標額（円）。0 は未設定 */
+  /**
+   * 貯金の目標額の決め方。'auto' はお金の目標（貯める・買う）の合計から自動で計算する。
+   * 未設定の古いデータは、目標額が入っていれば 'manual'、なければ 'auto' として扱う。
+   */
+  savingsTargetMode?: 'auto' | 'manual';
+  /** 貯金の目標額（円）。0 は未設定（手動のときに使う） */
   savingsTarget: number;
-  /** 目標達成期限 "YYYY-MM"。空文字は未設定 */
+  /** 目標達成期限 "YYYY-MM"。空文字は未設定（手動のときに使う） */
   targetMonth: string;
   /** 想定年利（%）。初期値 0。保証された値ではなく仮定 */
   annualReturnRate: number;
@@ -95,7 +111,7 @@ export interface GoalPlan {
   weeklyHours: number;
   /** 時間をどの枠から使うか */
   timeSource: TimeSource;
-  /** 必要な予算（円、総額） */
+  /** 必要な予算（円、総額）。お金の目標では「目標金額」 */
   budget: number;
   /** 優先順位。1 が最優先。ユーザーが決める */
   priority: number;
@@ -113,9 +129,18 @@ export interface LifeDomain {
   isSample?: boolean;
 }
 
+/** 目標の種類。'money' はお金を貯める・何かを買うための目標 */
+export type GoalKind = 'general' | 'money';
+
 export interface Goal {
   id: string;
   name: string;
+  /** 目標の種類（未設定は 'general'） */
+  kind?: GoalKind;
+  /** お金の目標の使い道。'save' = 貯めておく、'buy' = 買う・使う */
+  moneyPurpose?: 'save' | 'buy';
+  /** お金の目標で、すでに貯まっている額（円） */
+  savedAmount?: number;
   domainId: string | null;
   /** 完了条件（例: 試験に合格する） */
   completionCriteria: string;

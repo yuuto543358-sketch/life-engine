@@ -80,7 +80,17 @@ export function GoalsTab({ scenario, edit }: { scenario: Scenario; edit: EditSce
               {fmtYen(f.budgetDemandMonthly, true)} / {fmtYen(f.budgetAvailableMonthly, true)}
             </span>
           </div>
+          {f.savingsDemandMonthly > 0 && (
+            <div className="capacity-row">
+              <span className="capacity-label">貯金</span>
+              <Meter value={Math.min(f.savingsDemandMonthly, f.savingsAvailableMonthly)} max={Math.max(f.savingsDemandMonthly, f.savingsAvailableMonthly, 1)} label="お金の目標に必要な毎月の貯金" color={f.savingsShortageMonthly > 0 ? 'var(--bad)' : 'var(--c-commute)'} />
+              <span className="capacity-num num">
+                {fmtYen(f.savingsDemandMonthly, true)} / {fmtYen(f.savingsAvailableMonthly, true)}
+              </span>
+            </div>
+          )}
           <p className="fineprint">
+            貯金: お金の目標に毎月必要な額 / 毎月の貯金・積立。
             時間: 目標に必要な週間時間 / 使える時間（指定した枠＋自由時間）。予算: 目標に必要な月額 / 貯金後の残り（{fmtYen(f.budgetAvailableMonthly, compact)}/月）。優先順位の高い目標から順に割り当てます。
           </p>
         </div>
@@ -158,7 +168,7 @@ function GoalCard({ goal, plan, result: r, open, onToggle, scenario, edit }: { g
   const setPlan = (p: Partial<GoalPlan>) => edit((s) => ({ ...s, goalPlans: { ...s.goalPlans, [goal.id]: { ...s.goalPlans[goal.id], ...p } } }));
   const setGoal = (p: Partial<Goal>) =>
     update((d) => ({ ...d, goals: d.goals.map((g) => (g.id === goal.id ? { ...g, ...p, updatedAt: nowIso() } : g)) }), { debounce: true });
-  const dl = deadlineTag(r);
+  const dl = r.isMoney ? null : deadlineTag(r);
   const otherScenarios = data.scenarios.filter((s) => s.id !== scenario.id && s.goalPlans[goal.id]).length;
 
   return (
@@ -170,7 +180,7 @@ function GoalCard({ goal, plan, result: r, open, onToggle, scenario, edit }: { g
         <span className="goal-card-main">
           <span className="goal-card-title">{goal.name}</span>
           <span className="goal-card-meta">
-            {domain?.name ?? '未分類'} · 期限 {plan.deadline ? fmtDate(plan.deadline) : '未設定'}
+            {r.isMoney ? (r.purpose === 'buy' ? 'お金・買う' : 'お金・貯める') : domain?.name ?? '未分類'} · {r.isMoney ? '目標日' : '期限'} {plan.deadline ? fmtDate(plan.deadline) : '未設定'}
           </span>
           <span className="goal-card-tags">
             {r.completed ? (
@@ -182,18 +192,29 @@ function GoalCard({ goal, plan, result: r, open, onToggle, scenario, edit }: { g
                     時間 {r.timeShort > 0 ? `週${fmtH(r.timeShort)}h不足` : `週${fmtH(r.weeklyHours)}h確保`}
                   </StatusTag>
                 )}
-                {r.remainingBudget > 0 && (
+                {r.remainingBudget > 0 && !r.isMoney && (
                   <StatusTag tone={r.budgetUncomputable ? 'warn' : r.monthlyShort > 0 ? 'bad' : 'good'}>
                     予算 {r.budgetUncomputable ? '期限を設定してください' : r.monthlyShort > 0 ? `月${fmtYen(r.monthlyShort, true)}不足` : `月${fmtYen(r.monthlyNeed ?? 0, true)}確保`}
+                  </StatusTag>
+                )}
+                {r.isMoney && (
+                  <StatusTag tone={r.budgetUncomputable ? 'warn' : r.monthlyShort > 0 ? 'bad' : 'good'}>
+                    {r.budgetUncomputable
+                      ? r.deadlineStatus === 'passed'
+                        ? '目標日が過ぎています'
+                        : '目標日を設定してください'
+                      : r.monthlyShort > 0
+                        ? `毎月${fmtYen(r.monthlyNeed ?? 0, true)}必要・月${fmtYen(r.monthlyShort, true)}不足`
+                        : `毎月${fmtYen(r.monthlyNeed ?? 0, true)}を貯金から確保`}
                   </StatusTag>
                 )}
                 {dl && dl.text !== '完了' && <StatusTag tone={dl.tone}>{dl.text}</StatusTag>}
               </>
             )}
           </span>
-          <Meter value={goal.progress} label={`${goal.name}の進捗`} />
+          <Meter value={r.progress} label={`${goal.name}の進捗`} color={r.isMoney ? 'var(--c-commute)' : undefined} />
         </span>
-        <span className="goal-card-pct num">{goal.progress}%</span>
+        <span className="goal-card-pct num">{Math.round(r.progress)}%</span>
       </button>
       {open && (
         <div className="goal-card-body">
@@ -208,7 +229,16 @@ function GoalCard({ goal, plan, result: r, open, onToggle, scenario, edit }: { g
                 </dd>
               </>
             )}
-            {r.budget > 0 && (
+            {r.isMoney && (
+              <>
+                <dt>お金</dt>
+                <dd>
+                  目標 {fmtYen(r.budget, compact)} − 貯まっている {fmtYen(r.saved, compact)} = あと {fmtYen(r.remainingBudget, compact)}
+                  {r.monthsLeft && r.monthlyNeed ? ` ÷ ${r.monthsLeft}か月 = 毎月${fmtYen(r.monthlyNeed, compact)}` : ''}
+                </dd>
+              </>
+            )}
+            {r.budget > 0 && !r.isMoney && (
               <>
                 <dt>予算</dt>
                 <dd>
@@ -229,12 +259,12 @@ function GoalCard({ goal, plan, result: r, open, onToggle, scenario, edit }: { g
 
           <h3 className="subhead">「{scenario.name}」での計画</h3>
           <Toggle label="この目標を計画に含める" checked={plan.included} onChange={(included) => setPlan({ included })} />
-          <GoalPlanFields plan={plan} onChange={setPlan} />
+          <GoalPlanFields plan={plan} onChange={setPlan} kind={goal.kind} saved={goal.savedAmount ?? 0} />
 
           <h3 className="subhead">
             目標の情報 <span className="subhead-note">全シナリオ共通{otherScenarios > 0 ? `・ほか${otherScenarios}件のシナリオにも反映` : ''}</span>
           </h3>
-          <GoalInfoFields goal={goal} onChange={setGoal} />
+          <GoalInfoFields goal={goal} onChange={setGoal} target={plan.budget} />
 
           <button type="button" className="btn btn-ghost btn-danger-text btn-block" onClick={() => setConfirm(true)}>
             <Icon name="trash" size={18} /> 目標を削除

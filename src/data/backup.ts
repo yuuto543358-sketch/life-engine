@@ -1,5 +1,6 @@
 import { isValidDate, isValidMonth } from '../engine/units';
 import { defaultProfile, defaultSettings, emptyFinance, emptyTimeBudget } from './defaults';
+import { BREAKDOWNS, BREAKDOWN_KINDS } from './breakdowns';
 import {
   CURRENT_SCENARIO_ID,
   SCHEMA_VERSION,
@@ -13,6 +14,7 @@ import {
   type Goal,
   type GoalPlan,
   type LifeDomain,
+  type MoneyItem,
   type NodeRef,
   type Scenario,
   type TimeBudget,
@@ -151,6 +153,9 @@ export function parseBackup(text: string): ImportResult {
       return {
         id: r.str(o.id, `${w}.id`),
         name: r.str(o.name, `${w}.name`),
+        ...(o.kind !== undefined ? { kind: r.oneOf(o.kind, `${w}.kind`, ['general', 'money'] as const) } : {}),
+        ...(o.moneyPurpose !== undefined ? { moneyPurpose: r.oneOf(o.moneyPurpose, `${w}.moneyPurpose`, ['save', 'buy'] as const) } : {}),
+        ...(o.savedAmount !== undefined ? { savedAmount: r.numIn(o.savedAmount, `${w}.savedAmount`, 0, MONEY_MAX) } : {}),
         domainId: o.domainId === null || o.domainId === undefined ? null : r.str(o.domainId, `${w}.domainId`),
         completionCriteria: r.str(o.completionCriteria, `${w}.completionCriteria`, { allowEmpty: true, fallback: '' }),
         progress: r.numIn(o.progress, `${w}.progress`, 0, 100),
@@ -189,21 +194,28 @@ export function parseBackup(text: string): ImportResult {
       const f = emptyFinance();
       f.monthlyIncome = r.numIn(o.monthlyIncome, `${w}.monthlyIncome`, 0, MONEY_MAX);
       f.fixedCosts = r.numIn(o.fixedCosts, `${w}.fixedCosts`, 0, MONEY_MAX);
-      if (o.fixedItems === undefined) {
-        delete f.fixedItems; // 内訳のない古い形式。合計額をそのまま使う
-      } else {
-        f.fixedItems = r.arr(o.fixedItems, `${w}.fixedItems`).map((x, i) => {
-          const ww = `${w}.fixedItems[${i}]`;
-          const it = r.obj(x, ww);
-          return { id: r.str(it.id, `${ww}.id`), label: r.str(it.label, `${ww}.label`), amount: r.numIn(it.amount, `${ww}.amount`, 0, MONEY_MAX) };
-        });
-        // 合計は内訳から計算し直して、食い違いを防ぐ
-        if (f.fixedItems.length > 0) f.fixedCosts = f.fixedItems.reduce((s, it) => s + it.amount, 0);
-      }
       f.variableCosts = r.numIn(o.variableCosts, `${w}.variableCosts`, 0, MONEY_MAX);
       f.monthlySavings = r.numIn(o.monthlySavings, `${w}.monthlySavings`, 0, MONEY_MAX);
+      // 内訳（任意）。ある場合は合計を内訳から計算し直して、食い違いを防ぐ
+      for (const kind of BREAKDOWN_KINDS) {
+        const { itemsKey, totalKey } = BREAKDOWNS[kind];
+        if (o[itemsKey] === undefined) continue; // 内訳のない古い形式。合計額をそのまま使う
+        const items: MoneyItem[] = r.arr(o[itemsKey], `${w}.${itemsKey}`).map((x, i) => {
+          const ww = `${w}.${itemsKey}[${i}]`;
+          const it = r.obj(x, ww);
+          return {
+            id: r.str(it.id, `${ww}.id`),
+            label: r.str(it.label, `${ww}.label`),
+            amount: r.numIn(it.amount, `${ww}.amount`, 0, MONEY_MAX),
+            ...(it.group !== undefined ? { group: r.str(it.group, `${ww}.group`) } : {}),
+          };
+        });
+        f[itemsKey] = items;
+        if (items.length > 0) f[totalKey] = items.reduce((sum, it) => sum + it.amount, 0);
+      }
       f.currentSavings = r.numIn(o.currentSavings, `${w}.currentSavings`, -MONEY_MAX, MONEY_MAX);
       f.savingsTarget = r.numIn(o.savingsTarget, `${w}.savingsTarget`, 0, MONEY_MAX);
+      if (o.savingsTargetMode !== undefined) f.savingsTargetMode = r.oneOf(o.savingsTargetMode, `${w}.savingsTargetMode`, ['auto', 'manual'] as const);
       f.targetMonth = r.month(o.targetMonth, `${w}.targetMonth`, true);
       f.annualReturnRate = r.numIn(o.annualReturnRate, `${w}.annualReturnRate`, 0, 100, 0);
       f.oneOffs = r.arr(o.oneOffs ?? [], `${w}.oneOffs`).map((x, i) => {

@@ -1,4 +1,4 @@
-import type { FinancialProfile, OneOffItem } from '../data/types';
+import type { BreakdownKind, FinancialProfile, MoneyItem, OneOffItem } from '../data/types';
 import { MONTHS_PER_YEAR, addMonths, monthIndex, monthsUntilInclusive, num } from './units';
 
 export interface MonthlyBalanceResult {
@@ -32,10 +32,26 @@ function money(v: unknown): number {
   return n < 0 ? 0 : n;
 }
 
-/** 固定費の合計（円/月）。内訳があれば内訳の合計、なければ fixedCosts */
-export function fixedTotal(fin: Pick<FinancialProfile, 'fixedCosts' | 'fixedItems'>): number {
-  if (fin?.fixedItems && fin.fixedItems.length > 0) return fin.fixedItems.reduce((s, i) => s + money(i.amount), 0);
-  return money(fin?.fixedCosts);
+const BREAKDOWN_KEYS = {
+  income: ['incomeItems', 'monthlyIncome'],
+  fixed: ['fixedItems', 'fixedCosts'],
+  variable: ['variableItems', 'variableCosts'],
+  savings: ['savingsItems', 'monthlySavings'],
+} as const satisfies Record<BreakdownKind, readonly [keyof FinancialProfile, keyof FinancialProfile]>;
+
+/**
+ * 内訳の合計（円/月）。内訳があれば内訳の合計（負の金額は 0 とする）、なければ合計の値をそのまま使う。
+ */
+export function breakdownTotal(fin: Partial<FinancialProfile>, kind: BreakdownKind): number {
+  const [itemsKey, totalKey] = BREAKDOWN_KEYS[kind];
+  const items = fin?.[itemsKey] as MoneyItem[] | undefined;
+  if (items && items.length > 0) return items.reduce((s, i) => s + money(i.amount), 0);
+  return money(fin?.[totalKey]);
+}
+
+/** 固定費の合計（円/月） */
+export function fixedTotal(fin: Partial<FinancialProfile>): number {
+  return breakdownTotal(fin, 'fixed');
 }
 
 /** 指定月に発生する臨時収支の合計（円、収入は正・支出は負） */
@@ -59,10 +75,10 @@ export function oneOffNetForMonth(items: OneOffItem[], ym: string): number {
  * 前提: 臨時収支は「今月を含む今後12か月」に発生するものを年間収支に含める。
  */
 export function calculateMonthlyBalance(fin: FinancialProfile, today: string): MonthlyBalanceResult {
-  const income = money(fin?.monthlyIncome);
-  const fixedCosts = fixedTotal(fin);
-  const variableCosts = money(fin?.variableCosts);
-  const plannedSavings = money(fin?.monthlySavings);
+  const income = breakdownTotal(fin, 'income');
+  const fixedCosts = breakdownTotal(fin, 'fixed');
+  const variableCosts = breakdownTotal(fin, 'variable');
+  const plannedSavings = breakdownTotal(fin, 'savings');
   const surplus = income - fixedCosts - variableCosts;
   const effectiveSavings = Math.min(plannedSavings, surplus);
   const unallocated = surplus - plannedSavings;

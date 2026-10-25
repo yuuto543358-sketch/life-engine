@@ -1,12 +1,14 @@
 import { useMemo, useState } from 'react';
 import { newId, useStore } from '../../data/store';
 import { CURRENT_SCENARIO_ID, type FinancialProfile, type OneOffItem, type Scenario } from '../../data/types';
-import { addMonths, isValidMonth, projectSavings } from '../../engine';
-import { AnimatedNumber, ConfirmSheet, Disclosure, NumberField, Segmented, Sheet, TextField, Toggle, StatusTag } from '../../ui/controls';
+import { addMonths, calculateAutoSavingsTarget, isValidMonth, projectSavings, resolveFinance, savingsTargetMode } from '../../engine';
+import { AnimatedNumber, ConfirmSheet, Disclosure, Meter, NumberField, Segmented, Sheet, TextField, Toggle, StatusTag } from '../../ui/controls';
 import { fmtMonth, fmtMonths, fmtYen, splitYen } from '../../ui/format';
 import { Icon } from '../../ui/Icon';
 import { useScenarioModel } from '../../ui/model';
-import { FixedCostEditor } from '../../ui/FixedCostEditor';
+import { BreakdownEditor } from '../../ui/BreakdownEditor';
+import { NewGoalSheet } from '../../ui/GoalEditor';
+import { setSavingsTotal } from '../../data/breakdowns';
 import { FlowBar, Legend, ProjectionChart } from '../../ui/viz';
 import type { EditScenario } from '../Simulator';
 
@@ -29,14 +31,16 @@ export function MoneyTab({ scenario, edit }: { scenario: Scenario; edit: EditSce
   const compact = data.settings.compactMoney;
   const [horizon, setHorizon] = useState<(typeof HORIZONS)[number]['value']>('60');
   const months = +horizon;
-  const { feasibility: f, projection: p0 } = useScenarioModel(scenario, months);
+  const { feasibility: f, projection: p, finance: rf } = useScenarioModel(scenario, months);
   const m = f.money;
   const fin = scenario.finance;
-  const p = p0;
+  const mode = savingsTargetMode(fin);
+  const auto = useMemo(() => calculateAutoSavingsTarget(scenario, data.goals, today), [scenario, data.goals, today]);
   const ghost = useMemo(
-    () => (scenario.id !== CURRENT_SCENARIO_ID ? projectSavings(current.finance, today, months) : null),
-    [scenario.id, current.finance, today, months],
+    () => (scenario.id !== CURRENT_SCENARIO_ID ? projectSavings(resolveFinance(current, data.goals, today), today, months) : null),
+    [scenario.id, current, data.goals, today, months],
   );
+  const [addingGoal, setAddingGoal] = useState(false);
   const setFin = (patch: Partial<FinancialProfile>) => edit((s) => ({ ...s, finance: { ...s.finance, ...patch } }));
   const goalFunded = f.goals.reduce((s, g) => s + g.monthlyFunded, 0);
   const remain = m.surplus - Math.max(0, m.effectiveSavings) - goalFunded;
@@ -94,10 +98,10 @@ export function MoneyTab({ scenario, edit }: { scenario: Scenario; edit: EditSce
       </section>
 
       <section className="stack-m" aria-label="毎月の収支">
-        <NumberField label="月の手取り収入" value={fin.monthlyIncome} onChange={(v) => setFin({ monthlyIncome: v })} min={0} max={1e10} step={1000} unit="円/月" slider={{ min: 0, max: 1000000, step: 5000 }} color={MONEY_COLORS.savings} />
-        <FixedCostEditor fin={fin} onChange={setFin} color={MONEY_COLORS.fixed} compactMoney={compact} />
-        <NumberField label="変動費" hint="食費・日用品・交際費など月によって変わる支出" value={fin.variableCosts} onChange={(v) => setFin({ variableCosts: v })} min={0} max={1e10} step={1000} unit="円/月" slider={{ min: 0, max: 500000, step: 1000 }} color={MONEY_COLORS.variable} />
-        <NumberField label="毎月の貯金額" hint="月間収支のうち、貯金に回す予定の額" value={fin.monthlySavings} onChange={(v) => setFin({ monthlySavings: v })} min={0} max={1e10} step={1000} unit="円/月" slider={{ min: 0, max: Math.max(300000, Math.ceil(Math.max(0, m.surplus) / 10000) * 10000), step: 1000 }} color={MONEY_COLORS.savings} />
+        <BreakdownEditor kind="income" fin={fin} onChange={setFin} color={MONEY_COLORS.savings} compactMoney={compact} hint="税金・社会保険料が引かれた後の、毎月使えるお金" />
+        <BreakdownEditor kind="fixed" fin={fin} onChange={setFin} color={MONEY_COLORS.fixed} compactMoney={compact} hint="家賃・光熱費・保険など、毎月ほぼ同じ支出" />
+        <BreakdownEditor kind="variable" fin={fin} onChange={setFin} color={MONEY_COLORS.variable} compactMoney={compact} hint="食費・日用品・交際費など、月によって変わる支出" />
+        <BreakdownEditor kind="savings" fin={fin} onChange={setFin} color={MONEY_COLORS.savings} compactMoney={compact} hint="預金・つみたてNISA・iDeCo など、毎月貯める・積み立てるお金。お金の目標はここから積み立てる計算です" />
       </section>
 
       <section className="panel" aria-label="将来の貯金残高">
@@ -111,9 +115,10 @@ export function MoneyTab({ scenario, edit }: { scenario: Scenario; edit: EditSce
             ...(ghost ? [{ id: 'ghost', label: '現在の計画', values: ghost.points.map((x) => ({ ym: x.ym, v: x.balance })), color: 'var(--ink-3)', ghost: true }] : []),
           ]}
           target={p.target}
-          deadline={fin.targetMonth || null}
+          deadline={rf.targetMonth || null}
         />
         {ghost && <Legend items={[{ label: scenario.name, color: 'var(--c-sleep)', kind: 'line' }, { label: '現在の計画', color: 'var(--ink-3)', kind: 'line' }]} />}
+        {p.target > 0 && mode === 'auto' && <p className="small muted">目標の線は、お金の目標から自動で計算した貯金の目標額（{fmtYen(p.target, compact)}）です。</p>}
         <p className="fineprint">
           入力した収支が毎月変わらず続くと仮定した計算値です{fin.annualReturnRate > 0 ? `（年利 ${fin.annualReturnRate}% を仮定）` : '（運用益は含めていません）'}。将来の残高を保証するものではありません。
         </p>
@@ -128,31 +133,49 @@ export function MoneyTab({ scenario, edit }: { scenario: Scenario; edit: EditSce
       <section className="panel" aria-label="貯金の目標">
         <h2 className="section-title">貯金の目標</h2>
         <div className="stack-m">
-          <NumberField label="現在の貯金額" value={fin.currentSavings} onChange={(v) => setFin({ currentSavings: v })} min={-1e10} max={1e11} step={10000} unit="円" slider={{ min: 0, max: 10000000, step: 10000 }} />
-          <NumberField label="貯金の目標額" value={fin.savingsTarget} onChange={(v) => setFin({ savingsTarget: v })} min={0} max={1e11} step={10000} unit="円" slider={{ min: 0, max: 20000000, step: 50000 }} hint="0 にすると目標なしとして扱います" />
-          <TextField label="目標達成期限（年月）" type="month" value={fin.targetMonth} onChange={(v) => setFin({ targetMonth: v === '' || isValidMonth(v) ? v : fin.targetMonth })} />
+          <NumberField label="現在の貯金額" value={fin.currentSavings} onChange={(v) => setFin({ currentSavings: v })} min={-1e10} max={1e11} step={10000} unit="円" slider={{ min: 0, max: 10000000, step: 10000 }} hint="預金・NISA などの合計" />
+          <div className="field">
+            <span className="field-label">目標額の決め方</span>
+            <Segmented
+              label="目標額の決め方"
+              options={[
+                { value: 'auto', label: 'お金の目標から自動' },
+                { value: 'manual', label: '自分で入力' },
+              ]}
+              value={mode}
+              onChange={(savingsTargetMode) => setFin({ savingsTargetMode })}
+            />
+          </div>
+          {mode === 'manual' ? (
+            <>
+              <NumberField label="貯金の目標額" value={fin.savingsTarget} onChange={(v) => setFin({ savingsTarget: v })} min={0} max={1e11} step={10000} unit="円" slider={{ min: 0, max: 20000000, step: 50000 }} hint="0 にすると目標なしとして扱います" />
+              <TextField label="目標達成期限（年月）" type="month" value={fin.targetMonth} onChange={(v) => setFin({ targetMonth: v === '' || isValidMonth(v) ? v : fin.targetMonth })} />
+            </>
+          ) : (
+            <AutoTargetPanel auto={auto} f={f} compact={compact} onAdd={() => setAddingGoal(true)} onApply={(total) => setFin(setSavingsTotal(fin, total))} />
+          )}
         </div>
         {p.target > 0 ? (
           <div className="goal-result">
             <GoalLine
-              label="目標達成まで"
+              label="残高が目標額に届くまで"
               value={p.alreadyReached ? '達成済み' : p.monthsToTarget ? fmtMonths(p.monthsToTarget) : '50年以内に届きません'}
-              sub={p.reachYm && !p.alreadyReached ? `${fmtMonth(p.reachYm)}末に到達する計算` : p.monthsToTarget === null ? '今の収支のままでは残高が目標に届きません' : undefined}
+              sub={p.reachYm && !p.alreadyReached ? `${fmtMonth(p.reachYm)}末に ${fmtYen(p.target, compact)} に到達する計算` : p.monthsToTarget === null ? '今の収支のままでは残高が目標に届きません' : undefined}
               tone={p.alreadyReached ? 'good' : p.monthsToTarget === null ? 'bad' : 'neutral'}
             />
-            {fin.targetMonth && (
+            {rf.targetMonth && (
               <GoalLine
                 label="期限までに"
                 value={p.deadlinePassed ? '期限が過ぎています' : p.reachableByDeadline ? '間に合う' : '間に合わない'}
                 sub={
                   p.deadlinePassed
-                    ? '期限を未来の年月に変更してください'
-                    : `${fmtMonth(fin.targetMonth)}末の残高 ${fmtYen(p.balanceAtDeadline ?? 0, compact)}（積立 ${p.monthsToDeadline}回）`
+                    ? '期限を未来の日付に変更してください'
+                    : `${fmtMonth(rf.targetMonth)}末の残高 ${fmtYen(p.balanceAtDeadline ?? 0, compact)}（積立 ${p.monthsToDeadline}回）`
                 }
                 tone={p.deadlinePassed ? 'warn' : p.reachableByDeadline ? 'good' : 'bad'}
               />
             )}
-            {fin.targetMonth && !p.deadlinePassed && p.requiredMonthly !== null && (
+            {mode === 'manual' && rf.targetMonth && !p.deadlinePassed && p.requiredMonthly !== null && (
               <GoalLine
                 label="期限に必要な月の貯金額"
                 value={fmtYen(p.requiredMonthly)}
@@ -166,7 +189,7 @@ export function MoneyTab({ scenario, edit }: { scenario: Scenario; edit: EditSce
                 tone={p.requiredMonthly > Math.max(0, m.surplus) ? 'bad' : p.requiredMonthly > m.plannedSavings ? 'warn' : 'good'}
                 action={
                   p.requiredMonthly <= Math.max(0, m.surplus) && p.requiredMonthly > m.plannedSavings ? (
-                    <button type="button" className="btn btn-small btn-ghost" onClick={() => setFin({ monthlySavings: p.requiredMonthly! })}>
+                    <button type="button" className="btn btn-small btn-ghost" onClick={() => setFin(setSavingsTotal(fin, p.requiredMonthly!))}>
                       この額にする
                     </button>
                   ) : undefined
@@ -174,10 +197,11 @@ export function MoneyTab({ scenario, edit }: { scenario: Scenario; edit: EditSce
               />
             )}
           </div>
-        ) : (
+        ) : mode === 'manual' ? (
           <p className="muted small">目標額を入れると、達成までの期間と必要な月額を計算します。</p>
-        )}
+        ) : null}
       </section>
+      <NewGoalSheet open={addingGoal} onClose={() => setAddingGoal(false)} scenarioId={scenario.id} initialKind="money" />
 
       <section className="panel" aria-label="臨時収入・臨時支出">
         <div className="panel-head">
@@ -236,6 +260,88 @@ export function MoneyTab({ scenario, edit }: { scenario: Scenario; edit: EditSce
         onDelete={(id) => setFin({ oneOffs: fin.oneOffs.filter((o) => o.id !== id) })}
         defaultMonth={addMonths(today.slice(0, 7), 0)}
       />
+    </div>
+  );
+}
+
+function AutoTargetPanel({ auto, f, compact, onAdd, onApply }: { auto: ReturnType<typeof calculateAutoSavingsTarget>; f: ReturnType<typeof useScenarioModel>['feasibility']; compact: boolean; onAdd: () => void; onApply: (total: number) => void }) {
+  const m = f.money;
+  if (auto.goals.length === 0) {
+    return (
+      <div className="auto-empty">
+        <p className="small">「〇〇円を貯める」「〇〇を買う」といったお金の目標を登録すると、貯金の目標額と、毎月いくら貯める必要があるかを自動で計算します。</p>
+        <button type="button" className="btn btn-small btn-primary" onClick={onAdd}>
+          <Icon name="plus" size={16} /> お金の目標を追加
+        </button>
+      </div>
+    );
+  }
+  const need = auto.monthlyNeed;
+  const planned = m.plannedSavings;
+  const short = Math.max(0, need - Math.max(0, m.effectiveSavings));
+  const result = new Map(f.goals.map((g) => [g.goalId, g]));
+  return (
+    <div className="auto-target">
+      <ul className="money-goals">
+        {auto.goals.map(({ goal, plan, need: n }) => {
+          const r = result.get(goal.id);
+          return (
+            <li key={goal.id} className="money-goal">
+              <div className="money-goal-top">
+                <span className="money-goal-name">
+                  {goal.name}
+                  <span className="badge">{goal.moneyPurpose === 'buy' ? '買う' : '貯める'}</span>
+                </span>
+                <span className="num money-goal-need">{n.monthlyNeed !== null ? `${fmtYen(n.monthlyNeed)}/月` : '—'}</span>
+              </div>
+              <Meter value={n.saved} max={n.target || 1} label={`${goal.name}の貯まっている額`} color="var(--c-commute)" />
+              <p className="money-goal-sub num">
+                {fmtYen(n.saved, compact)} / {fmtYen(n.target, compact)}
+                {plan.deadline ? ` · ${plan.deadline.replace(/-/g, '/')}まで（${n.months ?? 0}か月）` : ' · 目標日 未設定'}
+              </p>
+              {n.status === 'no-date' && <StatusTag tone="warn">目標日を設定すると毎月の額を計算します</StatusTag>}
+              {n.status === 'passed' && <StatusTag tone="warn">目標日が過ぎています</StatusTag>}
+              {n.status === 'done' && <StatusTag tone="good">達成</StatusTag>}
+              {r && r.monthlyShort > 0 && <StatusTag tone="bad">毎月の貯金から月 {fmtYen(r.monthlyShort, compact)} 足りない</StatusTag>}
+            </li>
+          );
+        })}
+      </ul>
+      <dl className="auto-sum">
+        <div>
+          <dt>貯金の目標額（自動）</dt>
+          <dd className="num">{fmtYen(auto.target, compact)}</dd>
+          <dd className="stat-sub">{auto.month ? `いちばん遅い目標日 ${fmtMonth(auto.month)}` : '目標日 未設定'}</dd>
+        </div>
+        <div>
+          <dt>毎月必要な貯金額</dt>
+          <dd className={`num ${short > 0 ? 'is-bad' : ''}`}>{fmtYen(need)}/月</dd>
+          <dd className="stat-sub">いまの毎月の貯金・積立 {fmtYen(planned)}</dd>
+        </div>
+      </dl>
+      {short > 0 ? (
+        <div className="callout callout-warn">
+          <Icon name="alert" size={18} />
+          <div>
+            <p>
+              目標日までに間に合わせるには、毎月の貯金をあと <strong>{fmtYen(short)}</strong> 増やす必要があります。
+            </p>
+            {need <= Math.max(0, m.surplus) ? (
+              <button type="button" className="btn btn-small btn-ghost" onClick={() => onApply(need)}>
+                毎月の貯金を {fmtYen(need, compact)} にする（差額は預金に入れる）
+              </button>
+            ) : (
+              <p className="small">必要な額が月間収支（{fmtYen(m.surplus, compact)}）を超えています。収入を増やすか、支出を減らすか、目標日を遅らせてください。</p>
+            )}
+          </div>
+        </div>
+      ) : need > 0 ? (
+        <div className="callout callout-good">
+          <Icon name="check" size={18} />
+          <p>いまの毎月の貯金で、すべてのお金の目標に間に合う計算です。</p>
+        </div>
+      ) : null}
+      <p className="fineprint">毎月必要な額 =（目標金額 − 貯まっている額）÷ 今月から目標日の月までの月数。目標ごとに計算して合計しています。お金の目標は「目標」タブで追加・編集できます。</p>
     </div>
   );
 }

@@ -1,6 +1,7 @@
-import { TIME_CATEGORY_KEYS, type ActualRecord, type Goal, type Scenario } from '../data/types';
+import { TIME_CATEGORY_KEYS, type ActualRecord, type BreakdownKind, type FinancialProfile, type Goal, type MoneyItem, type Scenario } from '../data/types';
 import { calculateGoalFeasibility } from './goals';
-import { fixedTotal, projectSavings } from './money';
+import { resolveFinance } from './moneyGoals';
+import { breakdownTotal, projectSavings } from './money';
 import { TIME_LABELS, TIME_SOURCE_LABELS } from './labels';
 import { round } from './units';
 
@@ -8,6 +9,18 @@ import { round } from './units';
  * シナリオを複製する。
  * 参照を共有しないよう、時間・お金・目標の計画値をすべて深くコピーする。
  */
+const BREAKDOWN_TITLES: [BreakdownKind, string][] = [
+  ['income', '収入'],
+  ['fixed', '固定費'],
+  ['variable', '変動費'],
+  ['savings', '貯金・積立'],
+];
+
+function itemsOf(fin: FinancialProfile, kind: BreakdownKind): MoneyItem[] {
+  const key = ({ income: 'incomeItems', fixed: 'fixedItems', variable: 'variableItems', savings: 'savingsItems' } as const)[kind];
+  return fin[key] ?? [];
+}
+
 export function cloneScenario(source: Scenario, opts: { id: string; name: string; now: string }): Scenario {
   const copy: Scenario = structuredCloneSafe(source);
   copy.id = opts.id;
@@ -58,30 +71,34 @@ export function diffScenarios(base: Scenario, target: Scenario, goals: Goal[]): 
   }
 
   const moneyFields: [keyof Scenario['finance'], string, ChangeUnit][] = [
-    ['monthlyIncome', '手取り収入', '円/月'],
-    ['fixedCosts', '固定費（合計）', '円/月'],
-    ['variableCosts', '変動費', '円/月'],
-    ['monthlySavings', '毎月の貯金額', '円/月'],
     ['currentSavings', '現在の貯金額', '円'],
     ['savingsTarget', '貯金の目標額', '円'],
     ['targetMonth', '貯金の期限', ''],
     ['annualReturnRate', '想定年利', '%'],
   ];
+  // 収入・固定費・変動費・貯金は、合計と、内訳の項目ごとの変更を示す（同じIDの項目どうしを比べる）
+  for (const [kind, title] of BREAKDOWN_TITLES) {
+    const ta = breakdownTotal(base.finance, kind);
+    const tb = breakdownTotal(target.finance, kind);
+    if (ta !== tb) changes.push({ group: 'money', label: `${title}（合計）`, from: ta, to: tb, unit: '円/月' });
+    const ia = itemsOf(base.finance, kind);
+    const ib = itemsOf(target.finance, kind);
+    for (const item of ib) {
+      const before = ia.find((x) => x.id === item.id);
+      const from = before ? before.amount : 0;
+      if (from !== item.amount) changes.push({ group: 'money', label: `${title}・${item.label}`, from, to: item.amount, unit: '円/月' });
+    }
+    for (const item of ia) {
+      if (item.amount !== 0 && !ib.some((x) => x.id === item.id)) changes.push({ group: 'money', label: `${title}・${item.label}`, from: item.amount, to: 0, unit: '円/月' });
+    }
+  }
+  if ((base.finance.savingsTargetMode ?? 'auto') !== (target.finance.savingsTargetMode ?? 'auto')) {
+    changes.push({ group: 'money', label: '貯金目標の決め方', from: base.finance.savingsTargetMode === 'manual' ? '手動' : '自動', to: target.finance.savingsTargetMode === 'manual' ? '手動' : '自動', unit: '' });
+  }
   for (const [field, label, unit] of moneyFields) {
-    const a = field === 'fixedCosts' ? fixedTotal(base.finance) : base.finance[field];
-    const b = field === 'fixedCosts' ? fixedTotal(target.finance) : target.finance[field];
+    const a = base.finance[field];
+    const b = target.finance[field];
     if (a !== b) changes.push({ group: 'money', label, from: a as string | number, to: b as string | number, unit });
-  }
-  // 固定費の内訳（同じIDの項目どうしを比べる）
-  const fa = base.finance.fixedItems ?? [];
-  const fb = target.finance.fixedItems ?? [];
-  for (const item of fb) {
-    const before = fa.find((x) => x.id === item.id);
-    if (!before) changes.push({ group: 'money', label: `固定費・${item.label}`, from: '項目なし', to: item.amount, unit: '円/月' });
-    else if (before.amount !== item.amount) changes.push({ group: 'money', label: `固定費・${item.label}`, from: before.amount, to: item.amount, unit: '円/月' });
-  }
-  for (const item of fa) {
-    if (!fb.some((x) => x.id === item.id)) changes.push({ group: 'money', label: `固定費・${item.label}`, from: item.amount, to: '項目なし', unit: '円/月' });
   }
   const sig = (s: Scenario) =>
     s.finance.oneOffs.map((o) => `${o.label}|${o.type}|${o.amount}|${o.month}|${o.repeatYearly}`).sort().join(';');
@@ -125,7 +142,7 @@ export interface ScenarioSummary {
   monthsToTarget: number | null;
   targetSet: boolean;
   reachableByDeadline: boolean | null;
-  /** 予算の不足（円/月）= 目標予算の不足 + 貯金額が収支を超える分 */
+  /** お金の不足（円/月）= 目標予算の不足 + 貯金額が収支を超える分 + お金の目標に必要な貯金の不足 */
   budgetShortage: number;
   /** 目標のうち範囲に収まる数 / 計画に含めた数 */
   goalsFit: number;
@@ -149,7 +166,7 @@ export function compareScenarios(
 ): ScenarioSummary[] {
   return scenarios.map((s) => {
     const f = calculateGoalFeasibility(s, goals, actuals, today);
-    const p = projectSavings(s.finance, today);
+    const p = projectSavings(resolveFinance(s, goals, today), today);
     return {
       id: s.id,
       name: s.name,
@@ -161,7 +178,7 @@ export function compareScenarios(
       monthsToTarget: p.target > 0 ? p.monthsToTarget : null,
       targetSet: p.target > 0,
       reachableByDeadline: p.reachableByDeadline,
-      budgetShortage: f.budgetShortageMonthly + f.money.savingsShortfall,
+      budgetShortage: f.budgetShortageMonthly + f.money.savingsShortfall + f.savingsShortageMonthly,
       goalsFit: f.fitCount,
       goalsActive: f.activeCount,
       goalsLate: f.goals.filter((g) => g.deadlineStatus === 'late' || g.deadlineStatus === 'stalled').length,

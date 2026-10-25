@@ -2,7 +2,6 @@ import {
   CURRENT_SCENARIO_ID,
   type AppSettings,
   type FinancialProfile,
-  type FixedCostItem,
   type GoalPlan,
   type LifeDomain,
   type Scenario,
@@ -23,28 +22,6 @@ export function emptyTimeBudget(): TimeBudget {
       other: { hoursPerDay: 1, daysPerWeek: 7 },
     },
   };
-}
-
-/** 固定費の内訳の初期項目（ID・名前・スライダーの上限） */
-export const FIXED_PRESETS: { id: string; label: string; max: number }[] = [
-  { id: 'fx-rent', label: '家賃・住宅ローン', max: 300000 },
-  { id: 'fx-utilities', label: '水道光熱費', max: 50000 },
-  { id: 'fx-phone', label: '通信費（スマホ・ネット）', max: 30000 },
-  { id: 'fx-insurance', label: '保険', max: 50000 },
-  { id: 'fx-subscription', label: 'サブスク', max: 20000 },
-  { id: 'fx-transport', label: '交通費（定期・車など）', max: 50000 },
-  { id: 'fx-loan', label: 'ローン返済', max: 100000 },
-  { id: 'fx-other', label: 'その他の固定費', max: 100000 },
-];
-
-/** 初期項目の内訳。otherAmount は「その他の固定費」に入れる金額（内訳がない古いデータの移行用） */
-export function defaultFixedItems(otherAmount = 0): FixedCostItem[] {
-  return FIXED_PRESETS.map((p) => ({ id: p.id, label: p.label, amount: p.id === 'fx-other' ? otherAmount : 0 }));
-}
-
-/** 内訳を返す。内訳がない古いデータは、合計額を「その他の固定費」に入れた初期項目で表す */
-export function ensureFixedItems(fin: Pick<FinancialProfile, 'fixedCosts' | 'fixedItems'>): FixedCostItem[] {
-  return fin.fixedItems && fin.fixedItems.length > 0 ? fin.fixedItems : defaultFixedItems(Math.max(0, fin.fixedCosts || 0));
 }
 
 export function emptyFinance(): FinancialProfile {

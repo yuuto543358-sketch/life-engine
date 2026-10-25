@@ -9,7 +9,7 @@ import { useScenarioModel } from '../ui/model';
 import { OnboardingSheet } from '../ui/Onboarding';
 import { href, navigate } from '../ui/router';
 import { ScreenHead } from '../ui/ScreenHead';
-import { Bullet, CAT_COLOR, FlowBar, HourGrid } from '../ui/viz';
+import { Bullet, CAT_COLOR, FlowBar, TimeDonut, TimeLegend } from '../ui/viz';
 import { MONEY_COLORS } from './sim/MoneyTab';
 
 export function HomeScreen() {
@@ -24,7 +24,7 @@ export function HomeScreen() {
         <ScreenHead eyebrow={dateLabel} title="LIFE ENGINE" />
         <section className="intro">
           <div className="intro-visual" aria-hidden="true">
-            <HourGrid items={current.time.items ? Object.entries(current.time.items).map(([key, v]) => ({ key: key as keyof typeof current.time.items, weeklyHours: v.hoursPerDay * v.daysPerWeek })) : []} totalHours={168} compact />
+            <TimeDonut items={Object.entries(current.time.items).map(([key, v]) => ({ key: key as keyof typeof current.time.items, weeklyHours: v.hoursPerDay * v.daysPerWeek }))} totalHours={168} size={200} />
           </div>
           <h2 className="intro-title">
             人生を、記録するだけでなく
@@ -82,11 +82,9 @@ export function HomeScreen() {
 function Overview() {
   const { data, current, today } = useStore();
   const compact = data.settings.compactMoney;
-  const { feasibility: f, projection: p } = useScenarioModel(current);
+  const { feasibility: f, projection: p, finance: fin } = useScenarioModel(current);
   const t = f.time;
   const m = f.money;
-  const freeLeft = Math.max(0, t.freeHours) - f.freeUsedByGoals;
-  const fin = current.finance;
 
   // 今月の変動費: 記録の合計と、計画の日割りの目安
   const monthStart = startOfMonth(today);
@@ -107,11 +105,10 @@ function Overview() {
             調整 <Icon name="chevron" size={14} />
           </a>
         </div>
-        <p className={`ov-num ${t.shortageHours > 0 ? 'is-bad' : ''}`}>
-          <AnimatedNumber value={t.shortageHours > 0 ? t.shortageHours : freeLeft} format={(v) => fmtH(v)} className="num" />
-          <span className="ov-unit">{t.shortageHours > 0 ? '時間/週 不足' : '時間/週 自由に使える'}</span>
-        </p>
-        <HourGrid items={t.items} totalHours={t.totalHours} goalFreeHours={f.freeUsedByGoals} compact />
+        <div className="ov-donut">
+          <TimeDonut items={t.items} totalHours={t.totalHours} goalFreeHours={f.freeUsedByGoals} size={150} compact />
+          <TimeLegend items={t.items} freeHours={t.freeHours} goalFreeHours={f.freeUsedByGoals} />
+        </div>
         <p className="ov-eq num">
           配分 {fmtH(t.allocatedHours)}h · 目標 {fmtH(f.timeDemand)}h（うち自由時間から {fmtH(f.freeUsedByGoals)}h）
         </p>
@@ -219,9 +216,11 @@ function GoalsSummary() {
                     <span className="goal-mini-name">{g.name}</span>
                     {r.completed ? <StatusTag tone="good">完了</StatusTag> : r.fits ? <StatusTag tone="good">両立</StatusTag> : <StatusTag tone="bad">要調整</StatusTag>}
                   </span>
-                  <Meter value={g.progress} label={`${g.name}の進捗`} />
+                  <Meter value={r.progress} label={`${g.name}の進捗`} color={r.isMoney ? 'var(--c-commute)' : undefined} />
                   <span className="goal-mini-meta num">
-                    進捗 {g.progress}% · 週{fmtH(r.weeklyHours)}h{r.deadline ? ` · 期限 ${fmtDate(r.deadline)}` : ''}
+                    {r.isMoney
+                      ? `${fmtYen(r.saved, true)} / ${fmtYen(r.budget, true)}${r.monthlyNeed ? ` · 毎月${fmtYen(r.monthlyNeed, true)}` : ''}${r.deadline ? ` · ${fmtDate(r.deadline)}まで` : ''}`
+                      : `進捗 ${g.progress}% · 週${fmtH(r.weeklyHours)}h${r.deadline ? ` · 期限 ${fmtDate(r.deadline)}` : ''}`}
                   </span>
                 </a>
               </li>

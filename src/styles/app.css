@@ -1234,42 +1234,6 @@ button.list-row:active {
   white-space: nowrap;
 }
 
-/* 168マス */
-.hourgrid {
-  display: grid;
-  grid-template-columns: repeat(24, 1fr);
-  gap: 3px;
-}
-.hourgrid-compact {
-  gap: 2px;
-}
-.hg-cell {
-  aspect-ratio: 1;
-  border-radius: 3px;
-  background: var(--surface-3);
-  transition: background-color var(--dur) var(--ease), box-shadow var(--dur);
-}
-.hourgrid-compact .hg-cell {
-  border-radius: 2px;
-}
-.hg-free {
-  background: transparent;
-  box-shadow: inset 0 0 0 1.25px var(--c-free);
-}
-.hg-goal {
-  background: color-mix(in srgb, var(--c-study) 45%, transparent);
-  box-shadow: inset 0 0 0 1.25px var(--c-study);
-}
-.hg-over {
-  background: repeating-linear-gradient(135deg, var(--bad) 0 2px, transparent 2px 4px);
-  box-shadow: inset 0 0 0 1.25px var(--bad);
-}
-.hg-outside {
-  background: transparent;
-  box-shadow: none;
-  opacity: 0.4;
-}
-
 /* 帯グラフ */
 .flowbar {
   position: relative;
@@ -2444,70 +2408,101 @@ button.domain-tr:active {
   bottom: auto;
 }
 
-/* 固定費の内訳 */
-.fixed-editor {
+/* お金の内訳 */
+.bd {
   display: grid;
-  gap: 12px;
+  gap: 10px;
   padding: 16px;
   border-radius: var(--radius-m);
   background: var(--surface);
   box-shadow: 0 0 0 1px var(--ring);
 }
-.fixed-head {
+.bd-head {
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
   gap: 12px;
 }
-.fixed-total {
+.bd-total {
   font-size: var(--fs-xl);
   font-weight: 700;
   letter-spacing: -0.01em;
   line-height: 1.3;
 }
-.fixed-bar {
-  display: flex;
-  gap: 2px;
-  height: 8px;
-  border-radius: 4px;
-  overflow: hidden;
-}
-.fixed-bar span {
-  height: 100%;
-  transition: width calc(var(--dur) * 1.3) var(--ease);
-}
-.fixed-list {
+.bd-groups {
   display: grid;
-}
-.fixed-item {
-  padding: 10px 0 4px;
   border-top: 1px solid var(--line);
 }
-.fixed-item .field {
+.bd-group {
+  border-bottom: 1px solid var(--line);
+}
+.bd-group-head {
+  width: 100%;
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  align-items: center;
+  gap: 8px;
+  min-height: 52px;
+  text-align: left;
+}
+.bd-group-name {
+  font-weight: 700;
+  font-size: var(--fs-m);
+  display: inline-flex;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
+}
+.bd-group-count {
+  font-size: var(--fs-xs);
+  font-weight: 500;
+  color: var(--ink-3);
+}
+.bd-group-sub {
+  font-weight: 700;
+  font-size: var(--fs-s);
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+}
+.bd-share {
+  font-size: var(--fs-xs);
+  color: var(--ink-3);
+  font-weight: 600;
+}
+.bd-chevron {
+  color: var(--ink-3);
+  transition: transform var(--dur) var(--ease);
+}
+.bd-group.is-open .bd-chevron {
+  transform: rotate(180deg);
+}
+.bd-items {
+  display: grid;
+  padding-bottom: 8px;
+  animation: fade-in var(--dur) var(--ease);
+}
+.bd-item {
+  padding: 8px 0 4px 10px;
+  border-left: 2px solid var(--line);
+}
+.bd-item + .bd-item {
+  margin-top: 4px;
+}
+.bd-item .field {
   grid-template-columns: 1fr auto;
   column-gap: 4px;
   row-gap: 4px;
 }
-.fixed-item .field-top,
-.fixed-item .field-error,
-.fixed-item .field-hint {
+.bd-item .field-top,
+.bd-item .field-error,
+.bd-item .field-hint {
   grid-column: 1 / -1;
 }
-.fixed-item .field-input {
+.bd-item .field-input {
   width: 6.5em;
 }
-.fixed-label {
-  display: inline-flex;
-  align-items: baseline;
-  gap: 6px;
-  flex-wrap: wrap;
-}
-.fixed-share {
-  font-size: var(--fs-xs);
-  font-weight: 600;
-  color: var(--ink-3);
-}
-.fixed-edit {
+.bd-edit {
   display: grid;
   place-items: center;
   width: 40px;
@@ -2515,6 +2510,198 @@ button.domain-tr:active {
   border-radius: 10px;
   color: var(--ink-3);
 }
-.fixed-edit:active {
+.bd-edit:active {
   background: var(--surface-2);
+}
+
+/* お金の目標 */
+.need-preview {
+  padding: 14px 16px;
+  border-radius: var(--radius-m);
+  background: var(--surface-2);
+  display: grid;
+  gap: 2px;
+}
+.need-label {
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  color: var(--ink-2);
+}
+.need-value {
+  font-size: var(--fs-xl);
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+.need-formula {
+  font-size: var(--fs-xs);
+  color: var(--ink-3);
+}
+.auto-empty {
+  display: grid;
+  gap: 10px;
+  justify-items: start;
+  padding: 14px;
+  border-radius: var(--radius-m);
+  background: var(--surface-2);
+}
+.auto-target {
+  display: grid;
+  gap: 14px;
+}
+.money-goals {
+  display: grid;
+  gap: 8px;
+}
+.money-goal {
+  display: grid;
+  gap: 6px;
+  padding: 12px 14px;
+  border-radius: var(--radius-m);
+  background: var(--surface-2);
+  justify-items: start;
+}
+.money-goal .meter {
+  width: 100%;
+}
+.money-goal-top {
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 10px;
+}
+.money-goal-name {
+  font-weight: 700;
+  min-width: 0;
+}
+.money-goal-need {
+  font-weight: 700;
+  white-space: nowrap;
+}
+.money-goal-sub {
+  font-size: var(--fs-xs);
+  color: var(--ink-3);
+}
+.auto-sum {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+.auto-sum dt {
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  color: var(--ink-3);
+}
+.auto-sum dd {
+  font-size: var(--fs-l);
+  font-weight: 700;
+}
+.auto-sum .stat-sub {
+  font-size: var(--fs-xs);
+  font-weight: 500;
+  color: var(--ink-3);
+}
+
+/* ドーナツグラフ */
+.donut-wrap {
+  display: grid;
+  place-items: center;
+  padding: 4px 0;
+}
+.donut {
+  position: relative;
+  flex: 0 0 auto;
+}
+.donut svg {
+  display: block;
+  overflow: visible;
+}
+.donut-seg {
+  stroke: var(--surface);
+  stroke-width: 2;
+  stroke-linejoin: round;
+  cursor: pointer;
+  transition: opacity var(--dur) var(--ease);
+}
+.donut-seg.is-dim {
+  opacity: 0.35;
+}
+.donut-goal {
+  opacity: 0.55;
+}
+.donut-goal.is-dim {
+  opacity: 0.2;
+}
+.donut-free {
+  opacity: 0.45;
+}
+.donut-free.is-dim {
+  opacity: 0.18;
+}
+.donut-over {
+  fill: var(--bad);
+}
+.donut-center {
+  position: absolute;
+  inset: 26%;
+  border-radius: 50%;
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  text-align: center;
+  gap: 0;
+}
+.donut-compact .donut-center {
+  inset: 24%;
+}
+.donut-c-label {
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  color: var(--ink-2);
+  line-height: 1.3;
+}
+.donut-c-value {
+  font-size: 30px;
+  font-weight: 700;
+  line-height: 1.15;
+  letter-spacing: -0.02em;
+}
+.donut-compact .donut-c-value {
+  font-size: 22px;
+}
+.donut-c-unit {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--ink-3);
+  margin-left: 2px;
+  letter-spacing: 0;
+}
+.donut-c-sub {
+  font-size: 11px;
+  color: var(--ink-3);
+}
+.ov-donut {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+.ov-donut .legend {
+  flex-direction: column;
+  flex-wrap: nowrap;
+  gap: 4px;
+  flex: 1;
+  min-width: 0;
+}
+.ov-donut .legend-item {
+  justify-content: space-between;
+}
+.ov-donut .legend-num {
+  margin-left: auto;
+}
+.center {
+  text-align: center;
+}
+.intro-visual {
+  display: grid;
+  place-items: center;
 }

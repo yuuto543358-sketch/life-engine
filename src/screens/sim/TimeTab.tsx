@@ -5,7 +5,7 @@ import { AnimatedNumber, Disclosure, NumberField, Stepper } from '../../ui/contr
 import { fmtH, fmtHours } from '../../ui/format';
 import { Icon } from '../../ui/Icon';
 import { useScenarioModel } from '../../ui/model';
-import { CAT_COLOR, HourGrid, TimeLegend } from '../../ui/viz';
+import { CAT_COLOR, TimeDonut, TimeLegend } from '../../ui/viz';
 import type { EditScenario } from '../Simulator';
 
 const HINTS: Partial<Record<TimeCategoryKey, string>> = {
@@ -26,23 +26,23 @@ export function TimeTab({ scenario, edit }: { scenario: Scenario; edit: EditScen
   return (
     <div className="stack-l">
       <section className="panel panel-hero" aria-label="1週間の時間配分">
-        <div className="hero-row">
-          <div>
-            <p className="hero-label">{short ? '時間が足りません' : '自由に使える時間'}</p>
-            <p className={`hero-num ${short ? 'is-bad' : ''}`}>
-              {short && <Icon name="alert" size={28} />}
-              <AnimatedNumber value={short ? t.shortageHours : t.freeHours} format={(v) => fmtH(v)} className="num" />
-              <span className="hero-unit">{short ? '時間 不足 / 週' : '時間 / 週'}</span>
-            </p>
-            {!short && (
-              <p className="hero-sub">
-                1日あたり {fmtH(t.freeHours / 7)}時間
+        <div>
+          <p className="hero-label">1週間 {fmtH(t.totalHours)}時間の使い方</p>
+          <p className="hero-sub">
+            {short ? (
+              <strong className="is-bad">配分が {fmtH(t.shortageHours)}時間 多すぎます</strong>
+            ) : (
+              <>
+                自由時間 {fmtH(t.freeHours)}時間（1日 {fmtH(t.freeHours / 7)}時間）
                 {f.freeUsedByGoals > 0 && <> · 目標で {fmtH(f.freeUsedByGoals)}時間 使用 → 残り {fmtH(remainingFree)}時間</>}
-              </p>
+              </>
             )}
-          </div>
+          </p>
         </div>
-        <HourGrid items={t.items} totalHours={t.totalHours} goalFreeHours={f.freeUsedByGoals} />
+        <div className="donut-wrap">
+          <TimeDonut items={t.items} totalHours={t.totalHours} goalFreeHours={f.freeUsedByGoals} size={232} />
+        </div>
+        <p className="fineprint center">グラフの色の部分を押すと、その項目の時間と割合を表示します</p>
         <TimeLegend items={t.items} freeHours={t.freeHours} goalFreeHours={f.freeUsedByGoals} />
         <p className="formula">
           <span className="num">{fmtH(t.totalHours)}</span>h（1週間）− <span className="num">{fmtH(t.allocatedHours)}</span>h（配分済み）=

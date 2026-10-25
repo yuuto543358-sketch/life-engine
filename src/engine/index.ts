@@ -7,5 +7,6 @@ export * from './labels';
 export * from './time';
 export * from './money';
 export * from './goals';
+export * from './moneyGoals';
 export * from './scenarios';
 export * from './deviation';

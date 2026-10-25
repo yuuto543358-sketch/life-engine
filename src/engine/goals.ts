@@ -1,6 +1,7 @@
 import type { ActualRecord, Goal, GoalPlan, Scenario, TimeSource } from '../data/types';
 import { calculateWeeklyTimeBudget, type WeeklyTimeBudgetResult } from './time';
 import { calculateMonthlyBalance, type MonthlyBalanceResult } from './money';
+import { calculateMoneyGoalNeed, isMoneyGoal } from './moneyGoals';
 import { addDays, clamp, daysBetween, isValidDate, monthsUntilInclusive, num, round, DAYS_PER_WEEK } from './units';
 
 export type DeadlineStatus =
@@ -65,11 +66,21 @@ export interface GoalFeasibility {
 
   /** 時間・予算ともに計画の範囲に収まっているか */
   fits: boolean;
+
+  // --- お金の目標（貯める・買う） ---
+  /** お金の目標か。お金の目標は「毎月の貯金」から積み立てる */
+  isMoney: boolean;
+  /** 使い道（お金の目標のみ） */
+  purpose: 'save' | 'buy' | null;
+  /** すでに貯まっている額（円、お金の目標のみ） */
+  saved: number;
+  /** 進捗（%）。お金の目標は 貯まっている額 ÷ 目標金額 */
+  progress: number;
 }
 
 export interface Conflict {
-  kind: 'time' | 'budget';
-  /** 不足量（時間は h/週、予算は 円/月） */
+  kind: 'time' | 'budget' | 'savings';
+  /** 不足量（時間は h/週、予算・貯金は 円/月） */
   amount: number;
   /** 不足に関係する目標ID（優先順位の高い順） */
   goalIds: string[];
@@ -94,6 +105,12 @@ export interface FeasibilityResult {
   budgetAvailableMonthly: number;
   /** 予算の不足（円/月） */
   budgetShortageMonthly: number;
+  /** お金の目標に毎月必要な額の合計（円/月） */
+  savingsDemandMonthly: number;
+  /** お金の目標に使える毎月の貯金（円/月）= max(0, 実際に貯金できる額) */
+  savingsAvailableMonthly: number;
+  /** お金の目標の不足（円/月） */
+  savingsShortageMonthly: number;
   conflicts: Conflict[];
   /** 計画に含めた未完了の目標の数 */
   activeCount: number;
@@ -128,7 +145,8 @@ export function orderGoals<T extends { goal: Goal; plan: GoalPlan }>(list: T[]):
  * ルール:
  * - 目標の時間は、指定した枠（例: 勉強）の時間の中から使う。枠を超えた分だけ自由時間から使う。
  *   同じ時間を二重に数えないよう、枠と自由時間は1時間ずつ順番に減らしていく。
- * - 予算は、月間収支から予定貯金額を引いた残りから、毎月必要な額を確保する。
+ * - 時間をかける目標の予算は、月間収支から予定貯金額を引いた残りから、毎月必要な額を確保する。
+ * - お金の目標（貯める・買う）は、毎月の貯金から、目標日までに毎月必要な額を確保する。
  * - 時間・予算とも、ユーザーが決めた優先順位の順に割り当てる。アプリが優先順位を決めることはない。
  * - 完了済み（進捗100%）と、計画に含めない目標は割り当てない。
  */
@@ -148,6 +166,8 @@ export function calculateGoalFeasibility(
   let freePool = Math.max(0, time.freeHours);
   const budgetAvailableMonthly = Math.max(0, money.unallocated);
   let budgetPool = budgetAvailableMonthly;
+  const savingsAvailableMonthly = Math.max(0, money.effectiveSavings);
+  let savingsPool = savingsAvailableMonthly;
 
   const entries = orderGoals(
     goals
@@ -156,8 +176,10 @@ export function calculateGoalFeasibility(
   );
 
   const results: GoalFeasibility[] = entries.map(({ goal, plan }, order) => {
-    const progress = clamp(num(goal.progress), 0, 100);
-    const completed = progress >= 100;
+    const isMoney = isMoneyGoal(goal);
+    const need = isMoney ? calculateMoneyGoalNeed(plan.budget, plan.deadline, goal.savedAmount ?? 0, today) : null;
+    const progress = need ? need.progress : clamp(num(goal.progress), 0, 100);
+    const completed = need ? need.status === 'done' : progress >= 100;
     const weeklyHours = completed ? 0 : Math.max(0, num(plan.weeklyHours));
 
     // 時間の割り当て
@@ -170,10 +192,10 @@ export function calculateGoalFeasibility(
     freePool -= fromFree;
     const timeShort = round(weeklyHours - fromCategory - fromFree, 4);
 
-    // 予算の割り当て
+    // 予算の割り当て（お金の目標は毎月の貯金から、そのほかは貯金後の残りから）
     const budget = Math.max(0, num(plan.budget));
     const goalSpent = spent[goal.id] ?? 0;
-    const remainingBudget = completed ? 0 : Math.max(0, budget - goalSpent);
+    const remainingBudget = completed ? 0 : need ? need.remaining : Math.max(0, budget - goalSpent);
     const hasDeadline = isValidDate(plan.deadline);
     const monthsLeftRaw = hasDeadline ? monthsUntilInclusive(today, plan.deadline) : null;
     const monthsLeft = monthsLeftRaw === null ? null : Math.max(0, monthsLeftRaw);
@@ -185,8 +207,14 @@ export function calculateGoalFeasibility(
     } else {
       monthlyNeed = 0;
     }
-    const monthlyFunded = Math.min(monthlyNeed ?? 0, budgetPool);
-    budgetPool -= monthlyFunded;
+    let monthlyFunded: number;
+    if (isMoney) {
+      monthlyFunded = Math.min(monthlyNeed ?? 0, savingsPool);
+      savingsPool -= monthlyFunded;
+    } else {
+      monthlyFunded = Math.min(monthlyNeed ?? 0, budgetPool);
+      budgetPool -= monthlyFunded;
+    }
     const monthlyShort = (monthlyNeed ?? 0) - monthlyFunded;
 
     // 期限の見込み
@@ -200,6 +228,9 @@ export function calculateGoalFeasibility(
       deadlineStatus = 'done';
     } else if (hasDeadline && daysBetween(today, plan.deadline) < 0) {
       deadlineStatus = 'passed';
+    } else if (isMoney) {
+      // お金の目標: 毎月必要な額を確保できれば目標日に間に合う
+      deadlineStatus = !hasDeadline ? 'unknown' : monthlyShort > 0 ? 'late' : 'on-track';
     } else if (remainingHours !== null) {
       if (remainingHours === 0) {
         estimatedFinish = today;
@@ -247,6 +278,10 @@ export function calculateGoalFeasibility(
       deadlineStatus,
       daysLate,
       fits,
+      isMoney,
+      purpose: isMoney ? (goal.moneyPurpose ?? 'save') : null,
+      saved: need ? need.saved : 0,
+      progress,
     };
   });
 
@@ -254,8 +289,12 @@ export function calculateGoalFeasibility(
   const timeDemand = round(active.reduce((s, r) => s + r.weeklyHours, 0), 4);
   const freeUsedByGoals = round(active.reduce((s, r) => s + r.fromFree, 0), 4);
   const goalTimeShort = round(active.reduce((s, r) => s + r.timeShort, 0), 4);
-  const budgetDemandMonthly = active.reduce((s, r) => s + (r.monthlyNeed ?? 0), 0);
-  const budgetShortageMonthly = active.reduce((s, r) => s + r.monthlyShort, 0);
+  const general = active.filter((r) => !r.isMoney);
+  const moneyGoals = active.filter((r) => r.isMoney);
+  const budgetDemandMonthly = general.reduce((s, r) => s + (r.monthlyNeed ?? 0), 0);
+  const budgetShortageMonthly = general.reduce((s, r) => s + r.monthlyShort, 0);
+  const savingsDemandMonthly = moneyGoals.reduce((s, r) => s + (r.monthlyNeed ?? 0), 0);
+  const savingsShortageMonthly = moneyGoals.reduce((s, r) => s + r.monthlyShort, 0);
 
   const conflicts: Conflict[] = [];
   if (time.shortageHours > 0) {
@@ -279,8 +318,16 @@ export function calculateGoalFeasibility(
     conflicts.push({
       kind: 'budget',
       amount: budgetShortageMonthly,
-      goalIds: active.filter((r) => r.monthlyShort > 0).map((r) => r.goalId),
+      goalIds: general.filter((r) => r.monthlyShort > 0).map((r) => r.goalId),
       message: `目標に必要な予算が月 ${budgetShortageMonthly.toLocaleString('ja-JP')}円 足りません`,
+    });
+  }
+  if (savingsShortageMonthly > 0) {
+    conflicts.push({
+      kind: 'savings',
+      amount: savingsShortageMonthly,
+      goalIds: moneyGoals.filter((r) => r.monthlyShort > 0).map((r) => r.goalId),
+      message: `お金の目標に必要な貯金が月 ${savingsShortageMonthly.toLocaleString('ja-JP')}円 足りません`,
     });
   }
 
@@ -295,6 +342,9 @@ export function calculateGoalFeasibility(
     budgetDemandMonthly,
     budgetAvailableMonthly,
     budgetShortageMonthly,
+    savingsDemandMonthly,
+    savingsAvailableMonthly,
+    savingsShortageMonthly,
     conflicts,
     activeCount: active.length,
     fitCount: active.filter((r) => r.fits).length,

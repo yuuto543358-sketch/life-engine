@@ -9,6 +9,11 @@ import {
   calculateTaskAccuracy,
   calculateWeeklyTimeBudget,
   fixedTotal,
+  breakdownTotal,
+  calculateMoneyGoalNeed,
+  calculateAutoSavingsTarget,
+  resolveFinance,
+  savingsTargetMode,
   cloneScenario,
   compareScenarios,
   diffScenarios,
@@ -346,7 +351,7 @@ describe('シナリオ', () => {
     alt.finance.monthlySavings = 70000;
     alt.goalPlans.a.weeklyHours = 10;
     const changes = diffScenarios(base, alt, [goal('a')]);
-    expect(changes.map((c) => c.label)).toEqual(['勉強（1日）', '毎月の貯金額', 'a・週間時間']);
+    expect(changes.map((c) => c.label)).toEqual(['勉強（1日）', '貯金・積立（合計）', 'a・週間時間']);
   });
 
   it('シナリオを比較すると、それぞれ独立して計算される', () => {
@@ -478,5 +483,104 @@ describe('固定費の内訳', () => {
     });
     const rec: ActualRecord[] = [{ id: 'x', type: 'expense', date: TODAY, expenseCategory: 'fixed', amount: 60000, goalId: null, memo: '', createdAt: NOW }];
     expect(calculatePlanDeviation(rec, s, [], periodFor('month', TODAY)).money.find((r) => r.key === 'fixed')).toMatchObject({ planned: 60000, actual: 60000, diff: 0 });
+  });
+});
+
+describe('お金の目標（貯める・買う）', () => {
+  it('目標日までに毎月貯める額 =（目標金額 − 貯まっている額）÷ 今月から目標日の月までの月数', () => {
+    // 2026-10 〜 2027-09 = 12か月、（600,000 − 120,000）÷ 12 = 40,000
+    expect(calculateMoneyGoalNeed(600000, '2027-09-30', 120000, TODAY)).toMatchObject({ remaining: 480000, months: 12, monthlyNeed: 40000, progress: 20, status: 'ok' });
+    // 割り切れないときは 1円単位で切り上げる
+    expect(calculateMoneyGoalNeed(100000, '2026-12-01', 0, TODAY).monthlyNeed).toBe(33334);
+  });
+
+  it('達成済み・目標日なし・目標日が過去は、無理に計算しない', () => {
+    expect(calculateMoneyGoalNeed(1000, '2027-01-01', 1500, TODAY)).toMatchObject({ status: 'done', monthlyNeed: 0, progress: 100 });
+    expect(calculateMoneyGoalNeed(1000, '', 0, TODAY)).toMatchObject({ status: 'no-date', monthlyNeed: null });
+    expect(calculateMoneyGoalNeed(1000, '2026-09-30', 0, TODAY)).toMatchObject({ status: 'passed', monthlyNeed: null });
+  });
+
+  const money = (id: string, purpose: 'save' | 'buy', saved: number) => goal(id, { kind: 'money', moneyPurpose: purpose, savedAmount: saved });
+
+  it('お金の目標は毎月の貯金から、優先順位の順に積み立てる', () => {
+    const s = scenarioWith((s) => {
+      // 毎月の貯金 50,000円
+      s.goalPlans.car = { ...defaultGoalPlan(1), budget: 360000, deadline: '2027-09-30' }; // 30,000/月
+      s.goalPlans.trip = { ...defaultGoalPlan(2), budget: 300000, deadline: '2027-09-30' }; // 25,000/月
+    });
+    const r = calculateGoalFeasibility(s, [money('car', 'buy', 0), money('trip', 'buy', 0)], [], TODAY);
+    expect(r.goals[0]).toMatchObject({ isMoney: true, monthlyNeed: 30000, monthlyFunded: 30000, monthlyShort: 0 });
+    expect(r.goals[1]).toMatchObject({ monthlyNeed: 25000, monthlyFunded: 20000, monthlyShort: 5000, fits: false });
+    expect(r.savingsDemandMonthly).toBe(55000);
+    expect(r.savingsShortageMonthly).toBe(5000);
+    expect(r.budgetDemandMonthly).toBe(0); // 貯金後の残りは使わない
+    expect(r.conflicts.find((c) => c.kind === 'savings')?.goalIds).toEqual(['trip']);
+  });
+
+  it('貯金の目標額をお金の目標から自動で計算する', () => {
+    const s = scenarioWith((s) => {
+      s.goalPlans.a = { ...defaultGoalPlan(1), budget: 1000000, deadline: '2028-03-31' };
+      s.goalPlans.b = { ...defaultGoalPlan(2), budget: 200000, deadline: '2027-03-31' };
+      s.goalPlans.done = { ...defaultGoalPlan(3), budget: 50000, deadline: '2027-03-31' };
+      s.goalPlans.off = { ...defaultGoalPlan(4), budget: 999999, deadline: '2027-03-31', included: false };
+      s.goalPlans.time = { ...defaultGoalPlan(5), budget: 777, deadline: '2027-03-31' };
+    });
+    const goals = [money('a', 'save', 400000), money('b', 'buy', 20000), money('done', 'buy', 50000), money('off', 'save', 0), goal('time')];
+    const auto = calculateAutoSavingsTarget(s, goals, TODAY);
+    expect(auto.target).toBe(1200000);
+    expect(auto.month).toBe('2028-03');
+    // a: 600,000 ÷ 18 = 33,334、b: 180,000 ÷ 6 = 30,000
+    expect(auto.monthlyNeed).toBe(33334 + 30000);
+    const fin = resolveFinance(s, goals, TODAY);
+    expect(fin).toMatchObject({ savingsTarget: 1200000, targetMonth: '2028-03' });
+  });
+
+  it('手動の設定なら、入力した目標額をそのまま使う', () => {
+    const s = scenarioWith((s) => {
+      s.finance.savingsTargetMode = 'manual';
+      s.finance.savingsTarget = 5000000;
+      s.finance.targetMonth = '2030-01';
+      s.goalPlans.a = { ...defaultGoalPlan(1), budget: 1000000, deadline: '2028-03-31' };
+    });
+    expect(resolveFinance(s, [money('a', 'save', 0)], TODAY)).toMatchObject({ savingsTarget: 5000000, targetMonth: '2030-01' });
+    // 未設定の古いデータは、目標額が入っていれば手動
+    expect(savingsTargetMode({ ...s.finance, savingsTargetMode: undefined })).toBe('manual');
+    expect(savingsTargetMode({ ...s.finance, savingsTargetMode: undefined, savingsTarget: 0 })).toBe('auto');
+  });
+});
+
+describe('お金の内訳（収入・変動費・貯金）', () => {
+  it('内訳があれば内訳の合計で収支を計算する', () => {
+    const fin = finance({
+      monthlyIncome: 1,
+      variableCosts: 1,
+      monthlySavings: 1,
+      incomeItems: [
+        { id: 'in-salary', label: '給与', amount: 250000 },
+        { id: 'in-side', label: '副業', amount: 30000 },
+      ],
+      variableItems: [
+        { id: 'vr-grocery', label: '食料品', amount: 40000 },
+        { id: 'vr-eatout', label: '外食', amount: 20000 },
+      ],
+      savingsItems: [
+        { id: 'sv-deposit', label: '預金', amount: 20000 },
+        { id: 'sv-nisa', label: 'つみたてNISA', amount: 30000 },
+      ],
+    });
+    expect(breakdownTotal(fin, 'income')).toBe(280000);
+    expect(calculateMonthlyBalance(fin, TODAY)).toMatchObject({ income: 280000, variableCosts: 60000, plannedSavings: 50000, surplus: 220000 });
+  });
+
+  it('シナリオの比較で、つみたてNISA などの項目ごとの変更を示す', () => {
+    const base = scenarioWith((s) => {
+      s.finance.savingsItems = [
+        { id: 'sv-deposit', label: '預金', amount: 20000 },
+        { id: 'sv-nisa', label: 'つみたてNISA', amount: 30000 },
+      ];
+    });
+    const alt = cloneScenario(base, { id: 'alt', name: '投資を増やす', now: NOW });
+    alt.finance.savingsItems![1].amount = 50000;
+    expect(diffScenarios(base, alt, []).map((c) => c.label)).toEqual(['貯金・積立（合計）', '貯金・積立・つみたてNISA']);
   });
 });

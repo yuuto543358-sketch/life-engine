@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { createBackup, parseBackup } from './backup';
 import { defaultDomains, defaultProfile, defaultSettings, emptyScenario } from './defaults';
 import { buildSample } from './sample';
+import { mergeItems, setSavingsTotal } from './breakdowns';
 import { diffData } from './store';
 import type { AppData } from './types';
 
@@ -127,7 +128,7 @@ describe('固定費の内訳のバックアップ', () => {
     const r = parseBackup(JSON.stringify(b));
     expect(r.ok).toBe(true);
     if (r.ok) {
-      expect(r.data.scenarios[0].finance.fixedItems).toHaveLength(8);
+      expect(r.data.scenarios[0].finance.fixedItems).toHaveLength(12);
       expect(r.data.scenarios[0].finance.fixedCosts).toBe(110000);
     }
   });
@@ -142,5 +143,35 @@ describe('固定費の内訳のバックアップ', () => {
     const b = createBackup(sampleData(), NOW);
     b.data.scenarios[0].finance.fixedItems![0].amount = -1;
     expect(parseBackup(JSON.stringify(b)).ok).toBe(false);
+  });
+});
+
+describe('内訳の表示用データ', () => {
+  it('保存された項目に、まだない初期項目を 0 円で加える（古い項目も残す）', () => {
+    const fin = { ...sampleData().scenarios[0].finance, fixedItems: [{ id: 'fx-utilities', label: '水道光熱費', amount: 12000 }] };
+    const items = mergeItems('fixed', fin);
+    expect(items.find((i) => i.id === 'fx-utilities')).toMatchObject({ amount: 12000, group: 'fx-g-util' });
+    expect(items.find((i) => i.id === 'fx-rent')).toMatchObject({ amount: 0, group: 'fx-g-home' });
+    expect(items.reduce((s, i) => s + i.amount, 0)).toBe(12000);
+  });
+  it('内訳がない古いデータは、合計額を代表の項目に入れる', () => {
+    const fin = { ...sampleData().scenarios[0].finance, variableItems: undefined, variableCosts: 70000 };
+    expect(mergeItems('variable', fin).find((i) => i.id === 'vr-other')?.amount).toBe(70000);
+  });
+  it('毎月の貯金の合計を変えるときは、差額を預金に加減する', () => {
+    const fin = sampleData().scenarios[0].finance; // 預金 20,000 + NISA 30,000
+    const patch = setSavingsTotal(fin, 65000);
+    expect(patch.monthlySavings).toBe(65000);
+    expect(patch.savingsItems?.find((i) => i.id === 'sv-deposit')?.amount).toBe(35000);
+    expect(patch.savingsItems?.find((i) => i.id === 'sv-nisa')?.amount).toBe(30000);
+  });
+  it('サンプルの合計と内訳が一致している', () => {
+    for (const s of sampleData().scenarios) {
+      const f = s.finance;
+      expect(f.fixedCosts).toBe(f.fixedItems!.reduce((a, i) => a + i.amount, 0));
+      expect(f.variableCosts).toBe(f.variableItems!.reduce((a, i) => a + i.amount, 0));
+      expect(f.monthlySavings).toBe(f.savingsItems!.reduce((a, i) => a + i.amount, 0));
+      expect(f.monthlyIncome).toBe(f.incomeItems!.reduce((a, i) => a + i.amount, 0));
+    }
   });
 });

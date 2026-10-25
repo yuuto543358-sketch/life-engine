@@ -70,7 +70,7 @@ function layout(data: AppData, feas: Map<string, GoalFeasibility>, plans: Record
       const f = feas.get(g.id);
       const labelAbove = dp ? p.y < dp.y - 10 : false;
       const status: MapNode['status'] = g.progress >= 100 ? 'done' : !plans[g.id]?.included ? 'off' : f && !f.fits ? 'bad' : 'ok';
-      nodes.push({ ref: { kind: 'goal', id: g.id }, key: `goal:${g.id}`, label: g.name, x: p.x, y: p.y, r: 17, progress: g.progress, status, domainId: domainId || null, labelAbove });
+      nodes.push({ ref: { kind: 'goal', id: g.id }, key: `goal:${g.id}`, label: g.name, x: p.x, y: p.y, r: 17, progress: f ? f.progress : g.progress, status, domainId: domainId || null, labelAbove });
     });
   }
   return nodes;
