@@ -28,7 +28,7 @@ export function ScreenHead({ eyebrow, title, children, place }: { eyebrow?: Reac
   return (
     <header className={`screen-head${place ? ' has-banner' : ''}`}>
       {place && <PlaceBanner view={PLACE_VIEWS[place]} />}
-      <TopActions settings={place !== 'settings'} tone={place ? 'glass' : 'plain'} />
+      <TopActions tone={place ? 'glass' : 'plain'} />
       <div className="screen-head-row">
         <div>
           {eyebrow && <p className="eyebrow">{eyebrow}</p>}
@@ -50,12 +50,6 @@ function SaveBadge() {
       </button>
     );
   }
-  if (saveStatus === 'saving') return <span className="savebadge">保存中…</span>;
-  if (saveStatus === 'saved')
-    return (
-      <span className="savebadge savebadge-ok">
-        <Icon name="check" size={14} /> 端末に保存済み
-      </span>
-    );
+  // 保存できているときは何も出さない（保存できなかったときだけ知らせる）
   return null;
 }

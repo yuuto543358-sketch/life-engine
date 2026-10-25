@@ -20,7 +20,7 @@ export function GuideSheet() {
   };
   const count = groups.reduce((s, g) => s + g.items.length, 0);
   return (
-    <Sheet open={open} onClose={close} title="どこに何がある？">
+    <Sheet open={open} onClose={close} title="メニュー">
       <div className="guide">
         <label className="guide-search">
           <Icon name="search" size={18} />
@@ -34,7 +34,7 @@ export function GuideSheet() {
 
         {!q && (
           <section aria-label="アプリの場所">
-            <h3 className="guide-group">アプリの場所（下のメニュー）</h3>
+            <h3 className="guide-group">場所（設定もここから）</h3>
             <ul className="guide-places">
               {PLACES.map((p) => (
                 <li key={p.tab}>
@@ -97,20 +97,14 @@ export function GuideSheet() {
   );
 }
 
-/** 画面の右上のボタン（さがす・設定）。どの画面でも同じ場所にある */
-export function TopActions({ settings = true, tone = 'glass' }: { settings?: boolean; tone?: 'glass' | 'plain' }) {
+/** 画面の右上のボタンはこれひとつ（メニュー: さがす・すべての場所・設定） */
+export function TopActions({ tone = 'glass' }: { tone?: 'glass' | 'plain' }) {
   return (
     <div className={`top-actions top-actions-${tone}`}>
-      <button type="button" className="top-action" onClick={openGuide} aria-label="どこに何がある？（さがす）">
-        <Icon name="search" size={19} />
-        <span className="top-action-label">さがす</span>
+      <button type="button" className="top-action" onClick={openGuide} aria-label="メニュー（さがす・設定）">
+        <Icon name="menu" size={19} />
+        <span className="top-action-label">メニュー</span>
       </button>
-      {settings && (
-        <a className="top-action" href={href('settings')} aria-label="設定（世界の調律）">
-          <Icon name="settings" size={19} />
-          <span className="top-action-label">設定</span>
-        </a>
-      )}
     </div>
   );
 }

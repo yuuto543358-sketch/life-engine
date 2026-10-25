@@ -1,16 +1,17 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useStore } from '../data/store';
 import type { ActualRecord, ChronicleEntry } from '../data/types';
-import { ERA_LABELS, LAW_LABELS, REGION_LABELS, nextSteps, recentEvents, type LawKey, type WorldStructure } from '../engine';
+import { ERA_LABELS, LAW_LABELS, REGION_LABELS, calculateAutoSavingsTarget, nextSteps, recentEvents, savingsTargetMode, type LawKey, type WorldStructure } from '../engine';
 import { Meter, Sheet, StatusTag } from '../ui/controls';
-import { fmtDate, fmtH, fmtShortDate, fmtYen, weekdayOf } from '../ui/format';
+import { fmtDate, fmtH, fmtMonth, fmtShortDate, fmtYen, weekdayOf } from '../ui/format';
 import { Icon } from '../ui/Icon';
 import { useScenarioModel } from '../ui/model';
 import { OnboardingSheet } from '../ui/Onboarding';
-import { href, navigate } from '../ui/router';
+import { navigate } from '../ui/router';
 import { describeRecord } from '../ui/recordViews';
 import { ChronicleEditor, newChronicle } from '../ui/ChronicleEditor';
 import { RecordEditor, newRecord } from './Actuals';
+import { RecordChooser } from '../ui/RecordChooser';
 import { LivingWorld } from '../paint/world/LivingWorld';
 import { TopActions } from '../ui/GuideSheet';
 import { motion, useScroll, useTransform } from 'motion/react';
@@ -45,6 +46,7 @@ export function HomeScreen() {
   const [selected, setSelected] = useState<WorldStructure | null>(null);
   const [record, setRecord] = useState<ActualRecord | null>(null);
   const [entry, setEntry] = useState<ChronicleEntry | null>(null);
+  const [choosing, setChoosing] = useState(false);
   const era = ERA_LABELS[state.era];
   const onboarded = data.profile.onboarded;
   // 世界が始まったら、風景が見えるように上へ戻す
@@ -128,16 +130,19 @@ export function HomeScreen() {
       <div className="wc-sheet">
         <div className="wc-grabber" aria-hidden="true" />
         <div className="wc-body">
-        <TodayFootprints onAdd={(t) => setRecord(newRecord(t, today))} onJournal={() => setEntry(newChronicle('journal', today))} onEdit={setRecord} />
+        <TodayFootprints onAdd={() => setChoosing(true)} onEdit={setRecord} onEditEntry={setEntry} />
         <NextSteps input={input} />
-        <ActivePlans />
-        <RecentChanges events={recentEvents(state)} />
-        <WorldStatus state={state} onSelect={setSelected} />
-        <Balance />
+        <PlanStatus />
+        <WorldStatus state={state} events={recentEvents(state)} onSelect={setSelected} />
         </div>
       </div>
 
       <StructureSheet s={selected} onClose={() => setSelected(null)} />
+      <RecordChooser
+        open={choosing}
+        onClose={() => setChoosing(false)}
+        onPick={(c) => (c === 'journal' || c === 'milestone' ? setEntry(newChronicle(c, today)) : setRecord(newRecord(c, today)))}
+      />
       <RecordEditor record={record} isNew={!!record && !data.actuals.some((a) => a.id === record.id)} onClose={() => setRecord(null)} />
       <ChronicleEditor entry={entry} isNew={!!entry && !data.chronicle.some((c) => c.id === entry.id)} onClose={() => setEntry(null)} />
     </>
@@ -167,7 +172,7 @@ function Stage({ world, children }: { world: ReactNode; children: ReactNode }) {
   );
 }
 
-function TodayFootprints({ onAdd, onJournal, onEdit }: { onAdd: (t: ActualRecord['type']) => void; onJournal: () => void; onEdit: (r: ActualRecord) => void }) {
+function TodayFootprints({ onAdd, onEdit, onEditEntry }: { onAdd: () => void; onEdit: (r: ActualRecord) => void; onEditEntry: (c: ChronicleEntry) => void }) {
   const { data, today } = useStore();
   const compact = data.settings.compactMoney;
   const todays = data.actuals.filter((a) => a.date === today).sort((a, b) => b.createdAt.localeCompare(a.createdAt));
@@ -179,26 +184,10 @@ function TodayFootprints({ onAdd, onJournal, onEdit }: { onAdd: (t: ActualRecord
         <h2 className="wc-title">
           <Icon name="lantern" size={18} /> 今日の足跡 <span className="wc-real">（今日の記録）</span>
         </h2>
-        <a className="section-link" href={href('log')}>
-          記録へ <Icon name="chevron" size={14} />
-        </a>
       </div>
-      <div className="quick-add" role="group" aria-label="足跡（記録）を残す">
-        {([
-          ['time', 'clock', '時間'],
-          ['expense', 'yen', 'お金'],
-          ['task', 'check', '作業'],
-        ] as const).map(([t, icon, label]) => (
-          <button key={t} type="button" className="quick-add-btn" onClick={() => onAdd(t)}>
-            <Icon name={icon} size={20} />
-            <span>{label}</span>
-          </button>
-        ))}
-        <button type="button" className="quick-add-btn" onClick={onJournal}>
-          <Icon name="feather" size={20} />
-          <span>旅の記録</span>
-        </button>
-      </div>
+      <button type="button" className="btn btn-primary btn-block record-btn" onClick={onAdd}>
+        <Icon name="plus" size={20} /> 記録する
+      </button>
       {todays.length === 0 && notes.length === 0 ? (
         <p className="wc-quiet">まだ今日の足跡はありません。何もしない日も、この世界は静かに続いています。</p>
       ) : (
@@ -217,10 +206,10 @@ function TodayFootprints({ onAdd, onJournal, onEdit }: { onAdd: (t: ActualRecord
           })}
           {notes.map((c) => (
             <li key={c.id}>
-              <a className="footprint" href={href('log')}>
+              <button type="button" className="footprint" onClick={() => onEditEntry(c)}>
                 <Icon name={c.kind === 'quiet' ? 'moon' : c.kind === 'milestone' ? 'monument' : 'feather'} size={14} />
-                <span className="footprint-title">{c.title || (c.kind === 'quiet' ? '静寂の地での記録' : '旅の記録')}</span>
-              </a>
+                <span className="footprint-title">{c.title || (c.kind === 'quiet' ? '休む場所での記録' : '日記')}</span>
+              </button>
             </li>
           ))}
         </ul>
@@ -254,25 +243,67 @@ function NextSteps({ input }: { input: ReturnType<typeof useWorld>['input'] }) {
   );
 }
 
-function ActivePlans() {
-  const { data, current } = useStore();
-  const { feasibility: f } = useScenarioModel(current);
+/** 計画のようす: 時間とお金の釣り合い、お金の目標の貯め方、進行中の目標（見るだけ。変えるときは下の「計画」から） */
+function PlanStatus() {
+  const { data, current, today } = useStore();
+  const compact = data.settings.compactMoney;
+  const { feasibility: f, projection: p } = useScenarioModel(current);
+  const free = Math.max(0, f.time.freeHours) - f.freeUsedByGoals;
   const active = f.goals.filter((g) => !g.completed).slice(0, 3);
   const goalById = new Map(data.goals.map((g) => [g.id, g]));
+  const auto = useMemo(() => calculateAutoSavingsTarget(current, data.goals, today), [current, data.goals, today]);
+  const autoMode = savingsTargetMode(current.finance) === 'auto';
+  const nextBonus = auto.bonusPlan[0];
   return (
-    <section className="wc-section anchor" id="h-plans" aria-label="進行中の開拓計画">
-      <div className="wc-head">
-        <h2 className="wc-title">
-          <Icon name="flag" size={18} /> 進行中の開拓計画 <span className="wc-real">（目標）</span>
-        </h2>
-        <a className="section-link" href={href('sim', 'goals')}>
-          計画へ <Icon name="chevron" size={14} />
-        </a>
+    <section className="wc-section anchor" id="h-plans" aria-label="計画のようす">
+      <h2 className="wc-title">
+        <Icon name="flag" size={18} /> 計画のようす <span className="wc-real">（時間・お金・目標）</span>
+      </h2>
+      <div className="balance">
+        <div className="balance-cell">
+          <span className="balance-label">{f.time.shortageHours > 0 ? '時間の不足' : '残る自由時間'}</span>
+          <span className={`balance-value num ${f.time.shortageHours > 0 ? 'is-bad' : ''}`}>
+            {fmtH(f.time.shortageHours > 0 ? f.time.shortageHours : free)}
+            <span className="unit">時間/週</span>
+          </span>
+        </div>
+        <div className="balance-cell">
+          <span className="balance-label">毎月の収支</span>
+          <span className={`balance-value num ${f.money.surplus < 0 ? 'is-bad' : ''}`}>
+            {fmtYen(f.money.surplus, compact, true)}
+            <span className="unit">/月</span>
+          </span>
+        </div>
+        {autoMode && auto.target > 0 ? (
+          <div className="balance-cell balance-wide">
+            <span className="balance-label">お金の目標の貯め方（合計 {fmtYen(auto.target, compact)}）</span>
+            <span className="balance-plan num">
+              毎月 <strong>{fmtYen(auto.monthlyNeed, compact)}</strong>
+              {auto.fromBonus > 0 && (
+                <>
+                  {' '}
+                  ＋ ボーナスのたびに <strong>{fmtYen(Math.max(...auto.bonusPlan.map((b) => b.amount)), compact)}</strong>
+                </>
+              )}
+            </span>
+            {nextBonus && (
+              <span className="balance-sub">
+                次は{fmtMonth(nextBonus.month)}のボーナスから {fmtYen(nextBonus.amount, compact)}（ボーナスで合計 {fmtYen(auto.fromBonus, compact)}・{auto.bonusPlan.length}回）
+              </span>
+            )}
+          </div>
+        ) : (
+          p.target > 0 && (
+            <div className="balance-cell balance-wide">
+              <span className="balance-label">貯金の目標 {fmtYen(p.target, compact)}</span>
+              <Meter value={Math.max(0, current.finance.currentSavings)} max={p.target} label="貯金の目標の進み具合" color="var(--c-commute)" />
+              <span className="balance-sub">{p.alreadyReached ? '目標額に達しています' : p.monthsToTarget ? `今のペースで約${p.monthsToTarget}か月後に到達` : '今の収支のままでは届かない計算です'}</span>
+            </div>
+          )
+        )}
       </div>
       {active.length === 0 ? (
-        <button type="button" className="empty-row" onClick={() => navigate('sim', 'goals')}>
-          <Icon name="plus" size={18} /> 開拓計画（目標）を立てると、原生域に旗が立ちます
-        </button>
+        <p className="wc-quiet">目標（開拓計画）は、下の「計画」→「目標」で立てられます。立てると、原生域に旗が立ちます。</p>
       ) : (
         <ul className="plans">
           {active.map((r) => {
@@ -285,7 +316,9 @@ function ActivePlans() {
                 </div>
                 <Meter value={r.progress} label={`${g.name}の進捗`} color={r.isMoney ? 'var(--c-commute)' : 'var(--accent)'} />
                 <p className="plan-meta num">
-                  {r.isMoney ? `${fmtYen(r.saved, true)} / ${fmtYen(r.budget, true)}${r.fromBonus > 0 ? ` · ボーナス${fmtYen(r.fromBonus, true)}` : ''}${r.monthlyNeed ? ` · 毎月${fmtYen(r.monthlyNeed, true)}` : ''}` : `進捗 ${Math.round(r.progress)}%${r.weeklyHours ? ` · 週${fmtH(r.weeklyHours)}時間` : ''}`}
+                  {r.isMoney
+                    ? `${fmtYen(r.saved, true)} / ${fmtYen(r.budget, true)}${r.monthlyNeed !== null ? ` · 毎月${fmtYen(r.monthlyNeed, true)}` : ''}${r.fromBonus > 0 ? `＋ボーナスから${fmtYen(r.fromBonus, true)}` : ''}`
+                    : `進捗 ${Math.round(r.progress)}%${r.weeklyHours ? ` · 週${fmtH(r.weeklyHours)}時間` : ''}`}
                   {r.deadline ? ` · ${fmtDate(r.deadline)}まで` : ''}
                 </p>
               </li>
@@ -297,17 +330,18 @@ function ActivePlans() {
   );
 }
 
-export function RecentChanges({ events, title = '最近の世界の変化' }: { events: ReturnType<typeof recentEvents>; title?: string }) {
+/** 世界のようす: 最近の変化と、なぜこの姿なのか（ひとつにまとめる） */
+function WorldStatus({ state, events, onSelect }: { state: ReturnType<typeof useWorld>['state']; events: ReturnType<typeof recentEvents>; onSelect: (s: WorldStructure) => void }) {
   return (
-    <section className="wc-section anchor" id="h-changes" aria-label={title}>
+    <section className="wc-section anchor" id="h-status" aria-label="世界のようす">
       <h2 className="wc-title">
-        <Icon name="sprout" size={18} /> {title}
+        <Icon name="sprout" size={18} /> 世界のようす <span className="wc-real">（最近の変化）</span>
       </h2>
       {events.length === 0 ? (
         <p className="wc-quiet">この2週間、世界は静かに過ごしていました。変化がない時間も、世界の一部です。</p>
       ) : (
         <ul className="changes-list">
-          {events.slice(0, 5).map((e) => (
+          {events.slice(0, 4).map((e) => (
             <li key={e.id} className="change">
               <span className={`change-icon law-${e.law}`}>
                 <Icon name={LAW_ICONS[e.law]} size={16} />
@@ -322,17 +356,10 @@ export function RecentChanges({ events, title = '最近の世界の変化' }: { 
           ))}
         </ul>
       )}
-    </section>
-  );
-}
-
-function WorldStatus({ state, onSelect }: { state: ReturnType<typeof useWorld>['state']; onSelect: (s: WorldStructure) => void }) {
-  return (
-    <section className="wc-section anchor" id="h-status" aria-label="世界のようす">
       <details className="disclosure world-status">
         <summary>
           <span>
-            <Icon name="mountain" size={18} /> 世界のようす（なぜこの姿なのか）
+            <Icon name="mountain" size={18} /> なぜこの姿なのか
           </span>
           <Icon name="chevron-down" size={18} className="disclosure-icon" />
         </summary>
@@ -392,43 +419,6 @@ function Region({ k, lines }: { k: 'wild' | 'nature' | 'paths'; lines: string[] 
   );
 }
 
-function Balance() {
-  const { data, current } = useStore();
-  const compact = data.settings.compactMoney;
-  const { feasibility: f, projection: p } = useScenarioModel(current);
-  const free = Math.max(0, f.time.freeHours) - f.freeUsedByGoals;
-  return (
-    <section className="wc-section anchor" id="h-balance" aria-label="暮らしの釣り合い">
-      <h2 className="wc-title">
-        <Icon name="scroll" size={18} /> 暮らしの釣り合い <span className="wc-real">（時間とお金）</span>
-      </h2>
-      <div className="balance">
-        <a className="balance-cell" href={href('sim', 'time')}>
-          <span className="balance-label">{f.time.shortageHours > 0 ? '時間の不足' : '残る自由時間'}</span>
-          <span className={`balance-value num ${f.time.shortageHours > 0 ? 'is-bad' : ''}`}>
-            {fmtH(f.time.shortageHours > 0 ? f.time.shortageHours : free)}
-            <span className="unit">時間/週</span>
-          </span>
-        </a>
-        <a className="balance-cell" href={href('sim', 'money')}>
-          <span className="balance-label">蓄え（毎月の収支）</span>
-          <span className={`balance-value num ${f.money.surplus < 0 ? 'is-bad' : ''}`}>
-            {fmtYen(f.money.surplus, compact, true)}
-            <span className="unit">/月</span>
-          </span>
-        </a>
-        {p.target > 0 && (
-          <a className="balance-cell balance-wide" href={href('sim', 'money')}>
-            <span className="balance-label">貯金の目標 {fmtYen(p.target, compact)}</span>
-            <Meter value={Math.max(0, current.finance.currentSavings)} max={p.target} label="貯金の目標の進み具合" color="var(--c-commute)" />
-            <span className="balance-sub">{p.alreadyReached ? '目標額に達しています' : p.monthsToTarget ? `今のペースで約${p.monthsToTarget}か月後に到達` : '今の収支のままでは届かない計算です'}</span>
-          </a>
-        )}
-      </div>
-    </section>
-  );
-}
-
 function StructureSheet({ s, onClose }: { s: WorldStructure | null; onClose: () => void }) {
   if (!s) return null;
   const region = REGION_LABELS[s.region];
@@ -440,30 +430,6 @@ function StructureSheet({ s, onClose }: { s: WorldStructure | null; onClose: () 
         <>
           <Icon name={STRUCTURE_ICONS[s.kind]} size={20} /> {s.name}
         </>
-      }
-      footer={
-        <div className="btn-row">
-          <button
-            type="button"
-            className="btn btn-ghost"
-            onClick={() => {
-              onClose();
-              navigate('map');
-            }}
-          >
-            <Icon name="map" size={18} /> 世界地図で見る
-          </button>
-          <button
-            type="button"
-            className="btn btn-primary"
-            onClick={() => {
-              onClose();
-              navigate('sim', 'goals');
-            }}
-          >
-            開拓計画を見る
-          </button>
-        </div>
       }
     >
       <div className="stack-m">

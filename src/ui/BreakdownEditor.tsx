@@ -10,7 +10,7 @@ import { Icon } from './Icon';
  * お金の内訳（収入・固定費・変動費・毎月の貯金や積立）をグループごとに入力する。
  * 合計は内訳から自動で計算し、合計の値にも同じ値を保存する。
  */
-export function BreakdownEditor({ kind, fin, onChange, color, hint, compactMoney }: { kind: BreakdownKind; fin: FinancialProfile; onChange: (patch: Partial<FinancialProfile>) => void; color?: string; hint?: string; compactMoney?: boolean }) {
+export function BreakdownEditor({ kind, fin, onChange, color, hint, compactMoney, bare }: { kind: BreakdownKind; fin: FinancialProfile; onChange: (patch: Partial<FinancialProfile>) => void; color?: string; hint?: string; compactMoney?: boolean; bare?: boolean }) {
   const def = BREAKDOWNS[kind];
   const items = mergeItems(kind, fin);
   const total = items.reduce((s, i) => s + i.amount, 0);
@@ -32,15 +32,19 @@ export function BreakdownEditor({ kind, fin, onChange, color, hint, compactMoney
     });
 
   return (
-    <section className="bd" aria-label={`${def.title}の内訳`}>
+    <section className={`bd${bare ? ' bd-bare' : ''}`} aria-label={`${def.title}の内訳`}>
       <div className="bd-head">
-        <div>
-          <p className="field-label">{def.title}</p>
-          <p className="bd-total num">
-            {fmtYen(total)}
-            <span className="unit">/月 · 合計</span>
-          </p>
-        </div>
+        {bare ? (
+          hint && <p className="field-hint">{hint}</p>
+        ) : (
+          <div>
+            <p className="field-label">{def.title}</p>
+            <p className="bd-total num">
+              {fmtYen(total)}
+              <span className="unit">/月 · 合計</span>
+            </p>
+          </div>
+        )}
         <button
           type="button"
           className="btn btn-small btn-ghost"
@@ -52,7 +56,7 @@ export function BreakdownEditor({ kind, fin, onChange, color, hint, compactMoney
           <Icon name="plus" size={16} /> 項目
         </button>
       </div>
-      {hint && <p className="field-hint">{hint}</p>}
+      {hint && !bare && <p className="field-hint">{hint}</p>}
 
       <div className="bd-groups">
         {def.groups.map((g) => {
@@ -189,5 +193,26 @@ function ItemSheet({ kind, item, isNew, onClose, onSave, onDelete }: { kind: Bre
         <NumberField label="金額" value={draft.amount} onChange={(amount) => setDraft({ ...draft, amount })} min={0} max={1e10} step={500} unit="円/月" slider={false} />
       </div>
     </Sheet>
+  );
+}
+
+/** 内訳をたたんだ1行（合計だけ見せて、押すと開いて入力できる） */
+export function BreakdownFold({ kind, title, fin, onChange, color, hint, compact }: { kind: BreakdownKind; title: string; fin: FinancialProfile; onChange: (patch: Partial<FinancialProfile>) => void; color: string; hint: string; compact: boolean }) {
+  const total = mergeItems(kind, fin).reduce((s, i) => s + i.amount, 0);
+  return (
+    <details className="bd-fold">
+      <summary>
+        <span className="swatch" style={{ background: color }} />
+        <span className="bd-fold-title">{title}</span>
+        <span className="bd-fold-total num">
+          {fmtYen(total, compact)}
+          <span className="unit">/月</span>
+        </span>
+        <Icon name="chevron-down" size={18} className="disclosure-icon" />
+      </summary>
+      <div className="bd-fold-body">
+        <BreakdownEditor kind={kind} fin={fin} onChange={onChange} color={color} hint={hint} compactMoney={compact} bare />
+      </div>
+    </details>
   );
 }

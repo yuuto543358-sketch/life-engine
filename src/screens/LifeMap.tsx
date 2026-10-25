@@ -187,17 +187,6 @@ export function LifeMapScreen() {
           <p className="fineprint">
             霧の中の場所は、まだ開拓計画も記録もない「未踏の地」です。未熟さではなく、これからの可能性を表します。金色の道は、あなたが登録したつながり（連結の法則）です。
           </p>
-          <div className="map-add">
-            <button type="button" className="btn btn-small btn-ghost" onClick={() => setNewGoalDomain(null)}>
-              <Icon name="plus" size={16} /> 開拓計画
-            </button>
-            <button type="button" className="btn btn-small btn-ghost" onClick={() => setAddDomain(true)}>
-              <Icon name="plus" size={16} /> 領域（場所）
-            </button>
-            <button type="button" className="btn btn-small btn-ghost" onClick={() => setDepAdd(true)} disabled={nodes.length < 2}>
-              <Icon name="link" size={16} /> つながり
-            </button>
-          </div>
         </section>
       )}
 
@@ -212,17 +201,6 @@ export function LifeMapScreen() {
           </div>
         )}
         <MapCanvas nodes={nodes} deps={data.dependencies} selected={selected} connectFrom={connectFrom} onTap={onTapNode} onMove={moveNode} onBackground={() => setSelected(null)} />
-        <div className="map-add">
-          <button type="button" className="btn btn-small btn-ghost" onClick={() => setNewGoalDomain(null)}>
-            <Icon name="plus" size={16} /> 目標
-          </button>
-          <button type="button" className="btn btn-small btn-ghost" onClick={() => setAddDomain(true)}>
-            <Icon name="plus" size={16} /> 領域
-          </button>
-          <button type="button" className="btn btn-small btn-ghost" onClick={() => setDepAdd(true)} disabled={nodes.length < 2}>
-            <Icon name="link" size={16} /> つながり
-          </button>
-        </div>
         <ul className="legend map-legend">
           <li className="legend-item">
             <span className="map-key map-key-ok" /> 両立
@@ -240,6 +218,16 @@ export function LifeMapScreen() {
         <p className="fineprint">丸をタップすると詳細とつながりの説明を表示します。丸をドラッグすると配置を変更、背景のドラッグで移動、2本指で拡大・縮小できます。</p>
       </section>
       )}
+
+      {/* 地図に足せるもの（どちらの表示でも同じ）。目標は「計画」→「目標」、または場所を押して追加する */}
+      <div className="map-add">
+        <button type="button" className="btn btn-small btn-ghost" onClick={() => setAddDomain(true)}>
+          <Icon name="plus" size={16} /> 領域（場所）を追加
+        </button>
+        <button type="button" className="btn btn-small btn-ghost" onClick={() => setDepAdd(true)} disabled={nodes.length < 2}>
+          <Icon name="link" size={16} /> つながりを追加
+        </button>
+      </div>
 
       <section className="section">
         <SectionHead

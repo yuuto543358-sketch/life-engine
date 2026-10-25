@@ -6,7 +6,7 @@ import { addDays, daysInMonth } from '../engine/units';
 import { Segmented, Sheet } from '../ui/controls';
 import { fmtShortDate, weekdayOf } from '../ui/format';
 import { Icon } from '../ui/Icon';
-import { ChronicleEditor, newChronicle } from '../ui/ChronicleEditor';
+import { ChronicleEditor } from '../ui/ChronicleEditor';
 import { describeRecord } from '../ui/recordViews';
 import { navigate, type Route } from '../ui/router';
 import { ScreenHead } from '../ui/ScreenHead';
@@ -92,14 +92,6 @@ function Timeline() {
 
   return (
     <div className="chronicle">
-      <div className="chronicle-actions">
-        <button type="button" className="btn btn-primary" onClick={() => setEditing(newChronicle('journal', today))}>
-          <Icon name="feather" size={18} /> 旅の記録を残す
-        </button>
-        <button type="button" className="btn btn-ghost" onClick={() => setEditing(newChronicle('milestone', today))}>
-          <Icon name="monument" size={18} /> 節目を刻む
-        </button>
-      </div>
       <div className="chips chips-scroll">
         {FILTERS.map((f) => (
           <button key={f.value} type="button" className="chip" aria-pressed={filter === f.value} onClick={() => setFilter(f.value)}>
@@ -114,7 +106,7 @@ function Timeline() {
             <Icon name="scroll" size={26} />
           </div>
           <p className="empty-title">年代記はまだ白紙です</p>
-          <p className="empty-text">旅の記録や足跡を残すと、ここに時間の流れとして積み重なっていきます。</p>
+          <p className="empty-text">ホームの「記録する」から日記や記録を残すと、ここに時間の流れとして積み重なっていきます。</p>
         </div>
       ) : (
         <ol className="timeline">

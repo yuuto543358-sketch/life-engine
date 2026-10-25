@@ -28,8 +28,8 @@ export const GUIDE: GuideGroup[] = [
   {
     title: '毎日の記録',
     items: [
-      { label: '今日の時間・お金・作業を記録する', where: ['ホーム', '今日の足跡'], keywords: '記録 足跡 実績 入力 つける 支出 使った', icon: 'lantern', tab: 'home', at: 'h-today' },
-      { label: '日記や写真を残す', where: ['ホーム', '今日の足跡', '旅の記録'], keywords: '日記 写真 旅 メモ', icon: 'feather', tab: 'home', at: 'h-today' },
+      { label: '今日の時間・お金・作業を記録する', where: ['ホーム', '記録する'], keywords: '記録 足跡 実績 入力 つける 支出 使った', icon: 'lantern', tab: 'home', at: 'h-today' },
+      { label: '日記や写真を残す', where: ['ホーム', '記録する', '日記・写真'], keywords: '日記 写真 旅 メモ', icon: 'feather', tab: 'home', at: 'h-today' },
       { label: '過去の日記・できごとを見る', where: ['記録', '日記・できごと'], keywords: '年代記 ふりかえり 過去 履歴 節目', icon: 'hall', tab: 'log' },
       { label: '予定と実績の差を見る', where: ['記録', '予定と実績', '計画との差'], keywords: '統計 観測 差 比較 グラフ 推移 集計', icon: 'layers', tab: 'log', sub: 'observe', at: 'o-diff' },
       { label: '週ごとの記録の推移を見る', where: ['記録', '予定と実績', '週ごとの推移'], keywords: 'グラフ 推移 週', icon: 'calendar', tab: 'log', sub: 'observe', at: 'o-trend' },
@@ -38,17 +38,17 @@ export const GUIDE: GuideGroup[] = [
   {
     title: 'お金',
     items: [
-      { label: '毎月の収入（手取り）を入れる', where: ['計画', 'お金', '収入と支出の内訳'], keywords: '給料 給与 手取り 収入 副業', icon: 'yen', tab: 'sim', sub: 'money', at: 'm-breakdown' },
-      { label: '家賃・光熱費などの固定費を入れる', where: ['計画', 'お金', '収入と支出の内訳'], keywords: '固定費 家賃 光熱費 通信 保険 サブスク ローン 支出', icon: 'home', tab: 'sim', sub: 'money', at: 'm-breakdown' },
-      { label: '食費などの変動費を入れる', where: ['計画', 'お金', '収入と支出の内訳'], keywords: '変動費 食費 日用品 交際費 支出', icon: 'note', tab: 'sim', sub: 'money', at: 'm-breakdown' },
-      { label: '毎月の貯金・つみたてNISA・iDeCo を入れる', where: ['計画', 'お金', '収入と支出の内訳', '毎月の貯金・積立'], keywords: '貯金 積立 NISA ニーサ iDeCo イデコ 投資 預金', icon: 'coin', tab: 'sim', sub: 'money', at: 'm-breakdown' },
-      { label: '今の貯金額を入れる', where: ['計画', 'お金', '貯金の目標'], keywords: '貯金額 残高 現在', icon: 'coin', tab: 'sim', sub: 'money', at: 'm-target' },
-      { label: '目標までに毎月いくら貯めるか見る', where: ['計画', 'お金', '貯金の目標'], keywords: '毎月 貯める 必要 自動計算 目標額', icon: 'target', tab: 'sim', sub: 'money', at: 'm-target' },
-      { label: 'ボーナスを登録する', where: ['計画', 'お金', 'ボーナス・臨時収入・臨時支出'], keywords: 'ボーナス 賞与 臨時収入 夏 冬', icon: 'spark', tab: 'sim', sub: 'money', at: 'm-oneoffs' },
-      { label: 'ボーナスのうち貯金に回す割合を変える', where: ['計画', 'お金', '貯金の目標', 'ボーナスも見込んで計算'], keywords: 'ボーナス 割合 パーセント 賞与', icon: 'spark', tab: 'sim', sub: 'money', at: 'm-target' },
-      { label: '旅行・家電などの臨時の出費を入れる', where: ['計画', 'お金', 'ボーナス・臨時収入・臨時支出'], keywords: '臨時支出 旅行 家電 出費 一時', icon: 'calendar', tab: 'sim', sub: 'money', at: 'm-oneoffs' },
+      { label: '毎月の収入（手取り）を入れる', where: ['計画', 'お金', '毎月の収支', '収入（手取り）'], keywords: '給料 給与 手取り 収入 副業', icon: 'yen', tab: 'sim', sub: 'money', at: 'm-flow' },
+      { label: '家賃・光熱費などの固定費を入れる', where: ['計画', 'お金', '毎月の収支', '固定費'], keywords: '固定費 家賃 光熱費 通信 保険 サブスク ローン 支出', icon: 'home', tab: 'sim', sub: 'money', at: 'm-flow' },
+      { label: '食費などの変動費を入れる', where: ['計画', 'お金', '毎月の収支', '変動費'], keywords: '変動費 食費 日用品 交際費 支出', icon: 'note', tab: 'sim', sub: 'money', at: 'm-flow' },
+      { label: '毎月の貯金・つみたてNISA・iDeCo を入れる', where: ['計画', 'お金', '毎月の収支', '毎月の貯金・積立'], keywords: '貯金 積立 NISA ニーサ iDeCo イデコ 投資 預金', icon: 'coin', tab: 'sim', sub: 'money', at: 'm-flow' },
+      { label: '今の貯金額を入れる', where: ['計画', 'お金', 'お金の目標の貯め方'], keywords: '貯金額 残高 現在', icon: 'coin', tab: 'sim', sub: 'money', at: 'm-target' },
+      { label: '目標までに毎月いくら・ボーナスでいくら貯めるか見る', where: ['計画', 'お金', 'お金の目標の貯め方'], keywords: '毎月 貯める 必要 自動計算 目標額 ボーナス 賞与', icon: 'target', tab: 'sim', sub: 'money', at: 'm-target' },
+      { label: 'ボーナスを登録する', where: ['計画', 'お金', 'ボーナス・臨時'], keywords: 'ボーナス 賞与 臨時収入 夏 冬', icon: 'spark', tab: 'sim', sub: 'money', at: 'm-oneoffs' },
+      { label: 'ボーナスのうち貯金に回す割合を変える', where: ['計画', 'お金', 'ボーナス・臨時'], keywords: 'ボーナス 割合 パーセント 賞与', icon: 'spark', tab: 'sim', sub: 'money', at: 'm-oneoffs' },
+      { label: '旅行・家電などの臨時の出費を入れる', where: ['計画', 'お金', 'ボーナス・臨時'], keywords: '臨時支出 旅行 家電 出費 一時', icon: 'calendar', tab: 'sim', sub: 'money', at: 'm-oneoffs' },
       { label: '将来の貯金残高のグラフを見る', where: ['計画', 'お金', '将来の貯金残高'], keywords: 'グラフ 将来 残高 何年後', icon: 'upload', tab: 'sim', sub: 'money', at: 'm-projection' },
-      { label: '想定の利回りを入れる', where: ['計画', 'お金', '想定利回り'], keywords: '利回り 年利 運用', icon: 'layers', tab: 'sim', sub: 'money', at: 'm-rate' },
+      { label: '想定の利回りを入れる', where: ['計画', 'お金', '将来の残高', '想定利回り'], keywords: '利回り 年利 運用', icon: 'layers', tab: 'sim', sub: 'money', at: 'm-projection' },
     ],
   },
   {
@@ -76,7 +76,7 @@ export const GUIDE: GuideGroup[] = [
   {
     title: '世界・休む',
     items: [
-      { label: '建物や森がなぜこの姿なのか見る', where: ['ホーム', '世界のようす'], keywords: '世界 建物 拠点 段階 森 理由', icon: 'mountain', tab: 'home', at: 'h-status' },
+      { label: '建物や森がなぜこの姿なのか見る', where: ['ホーム', '世界のようす', 'なぜこの姿なのか'], keywords: '世界 建物 拠点 段階 森 理由', icon: 'mountain', tab: 'home', at: 'h-status' },
       { label: '人生の領域を地図で見る', where: ['地図', '世界地図'], keywords: '地図 領域 全体', icon: 'map', tab: 'map', params: { view: 'map' } },
       { label: '過去の月の世界を見る', where: ['記録', '日記・できごと', '「この月の世界」'], keywords: '過去 月 世界 ふりかえり', icon: 'scroll', tab: 'log' },
       { label: 'ふりかえり・明日の準備をする', where: ['休む'], keywords: '静寂 休む ふりかえり 明日 準備 何もしない 日記', icon: 'moon', tab: 'quiet' },

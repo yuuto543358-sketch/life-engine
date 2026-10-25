@@ -61,11 +61,7 @@ export function SettingsScreen() {
 
   return (
     <>
-      <ScreenHead place="settings" eyebrow="世界の調律" title="設定とデータ">
-        <a className="back-link" href="#/home">
-          <Icon name="chevron-left" size={16} /> ホームへ戻る
-        </a>
-      </ScreenHead>
+      <ScreenHead place="settings" eyebrow="世界の調律" title="設定とデータ" />
       <SectionNav
         label="設定のページの目次"
         items={[

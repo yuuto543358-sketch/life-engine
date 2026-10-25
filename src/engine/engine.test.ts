@@ -605,6 +605,8 @@ describe('ボーナスを見込んだお金の目標', () => {
     expect(needs.get('b')).toMatchObject({ fromBonus: 0, monthlyNeed: 50000 });
     const auto = calculateAutoSavingsTarget(s, [money('a'), money('b')], TODAY);
     expect(auto).toMatchObject({ fromBonus: 150000, monthlyNeed: 58334, bonusRate: 50 });
+    // ボーナスごとの使いみち: 2026-12 の冬のボーナスから a に 150,000
+    expect(auto.bonusPlan).toEqual([{ month: '2026-12', label: '冬のボーナス', amount: 150000, goals: [{ goalId: 'a', name: 'a', amount: 150000 }] }]);
   });
 
   it('ボーナスで足りれば、使うのは必要な額だけ。割合 0% ならボーナスを使わない', () => {

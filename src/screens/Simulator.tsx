@@ -50,7 +50,7 @@ export function SimulatorScreen({ route }: { route: Route }) {
         </button>
       </ScreenHead>
 
-      <EngineBar scenario={scenario} onJump={(t) => go(t)} />
+      <EngineBar scenario={scenario} />
 
       <div className="sim-tabs">
         <Segmented label="シミュレーターの項目" options={SIM_TABS} value={sub} onChange={(t) => go(t)} />
@@ -103,7 +103,7 @@ export function SimulatorScreen({ route }: { route: Route }) {
 }
 
 /** 時間・お金・目標の現在値を常に表示するバー。値を動かすとここも即座に変わる */
-function EngineBar({ scenario, onJump }: { scenario: Scenario; onJump: (t: SimTab) => void }) {
+function EngineBar({ scenario }: { scenario: Scenario }) {
   const { data } = useStore();
   const compact = data.settings.compactMoney;
   const { feasibility: f } = useScenarioModel(scenario);
@@ -113,7 +113,7 @@ function EngineBar({ scenario, onJump }: { scenario: Scenario; onJump: (t: SimTa
   const goalsOk = f.activeCount === 0 || f.fitCount === f.activeCount;
   return (
     <div className="engine-bar" role="region" aria-label="計算結果の要約">
-      <button type="button" className={`engine-cell ${timeShort > 0 ? 'is-bad' : ''}`} onClick={() => onJump('time')}>
+      <div className={`engine-cell ${timeShort > 0 ? 'is-bad' : ''}`}>
         <span className="engine-label">
           <Icon name={timeShort > 0 ? 'alert' : 'clock'} size={14} /> {timeShort > 0 ? '時間の不足' : '残る自由時間'}
         </span>
@@ -121,8 +121,8 @@ function EngineBar({ scenario, onJump }: { scenario: Scenario; onJump: (t: SimTa
           <AnimatedNumber value={timeShort > 0 ? timeShort : free} format={(v) => fmtH(v)} className="num" />
           <span className="unit">h/週</span>
         </span>
-      </button>
-      <button type="button" className={`engine-cell ${left < 0 ? 'is-bad' : ''}`} onClick={() => onJump('money')}>
+      </div>
+      <div className={`engine-cell ${left < 0 ? 'is-bad' : ''}`}>
         <span className="engine-label">
           <Icon name={left < 0 ? 'alert' : 'yen'} size={14} /> {left < 0 ? 'お金の不足' : '月の残り'}
         </span>
@@ -130,8 +130,8 @@ function EngineBar({ scenario, onJump }: { scenario: Scenario; onJump: (t: SimTa
           <AnimatedNumber value={Math.abs(left)} format={(v) => fmtYen(v, compact).replace(/円$/, '')} className="num" />
           <span className="unit">円/月</span>
         </span>
-      </button>
-      <button type="button" className={`engine-cell ${goalsOk ? '' : 'is-bad'}`} onClick={() => onJump('goals')}>
+      </div>
+      <div className={`engine-cell ${goalsOk ? '' : 'is-bad'}`}>
         <span className="engine-label">
           <Icon name={goalsOk ? 'flag' : 'alert'} size={14} /> 計画の両立
         </span>
@@ -139,7 +139,7 @@ function EngineBar({ scenario, onJump }: { scenario: Scenario; onJump: (t: SimTa
           <span className="num">{f.fitCount}</span>
           <span className="unit">/ {f.activeCount}件</span>
         </span>
-      </button>
+      </div>
     </div>
   );
 }

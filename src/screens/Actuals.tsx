@@ -61,11 +61,6 @@ export function ActualsScreen({ embedded }: { embedded?: boolean } = {}) {
   const goalRows = dev.goals.filter((g) => g.hasRecords);
   const unrecorded = dev.time.filter((r) => !r.recorded && r.planned > 0).map((r) => TIME_LABELS[r.key]);
 
-  const startNew = (type: ActualRecord['type'] = 'time') => {
-    setIsNew(true);
-    setEditing(newRecord(type, offset === 0 || kind !== 'day' ? today : period.start));
-  };
-
   return (
     <>
       {embedded ? (
@@ -108,23 +103,9 @@ export function ActualsScreen({ embedded }: { embedded?: boolean } = {}) {
         </div>
       </div>
 
-      <div className="quick-add" role="group" aria-label="記録を追加">
-        {([
-          ['time', 'clock', '時間'],
-          ['expense', 'yen', '支出'],
-          ['task', 'check', '作業'],
-          ['progress', 'target', '進捗'],
-        ] as const).map(([t, icon, label]) => (
-          <button key={t} type="button" className="quick-add-btn" onClick={() => startNew(t)}>
-            <Icon name={icon} size={20} />
-            <span>{label}を記録</span>
-          </button>
-        ))}
-      </div>
-
       {dev.recordCount === 0 ? (
         <Empty icon="log" title="この期間の記録はありません">
-          上のボタンから記録すると、{kind === 'day' ? '1日' : kind === 'week' ? '1週間' : '1か月'}の計画値と比べた差を表示します。
+          ホームの「記録する」から記録すると、{kind === 'day' ? '1日' : kind === 'week' ? '1週間' : '1か月'}の計画値と比べた差を表示します。
         </Empty>
       ) : (
         <>

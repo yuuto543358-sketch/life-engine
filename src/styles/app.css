@@ -4136,3 +4136,174 @@ button.domain-tr:active {
     box-shadow: 0 0 0 0 transparent;
   }
 }
+
+/* 計画のようす: お金の目標の貯め方 */
+.balance-plan {
+  font-size: var(--fs-m);
+  line-height: 1.5;
+}
+.balance-plan strong {
+  font-size: var(--fs-l);
+}
+.record-btn {
+  min-height: 52px;
+}
+
+/* 記録の種類を選ぶ */
+.choice-list {
+  display: grid;
+  gap: 6px;
+}
+.choice {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 12px;
+  border-radius: 14px;
+  background: var(--surface);
+  box-shadow: 0 0 0 1px var(--ring);
+  text-align: left;
+  color: var(--ink);
+}
+.choice:active {
+  background: var(--surface-2);
+}
+.choice-icon {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  background: var(--accent-wash);
+  color: var(--accent);
+}
+.choice-text {
+  flex: 1;
+  display: grid;
+  gap: 2px;
+}
+.choice-label {
+  font-weight: 700;
+}
+.choice-hint {
+  font-size: var(--fs-xs);
+  color: var(--ink-3);
+}
+.choice > svg:last-child {
+  color: var(--ink-3);
+}
+
+/* お金の内訳（たたんだ1行） */
+.bd-folds {
+  display: grid;
+  gap: 6px;
+  margin-top: 6px;
+}
+.bd-fold {
+  border-radius: var(--radius-m);
+  background: var(--surface-2);
+}
+.bd-fold > summary {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 50px;
+  padding: 0 14px;
+  list-style: none;
+  cursor: pointer;
+}
+.bd-fold > summary::-webkit-details-marker {
+  display: none;
+}
+.bd-fold-title {
+  flex: 1;
+  font-weight: 700;
+  font-size: var(--fs-m);
+}
+.bd-fold-total {
+  font-weight: 700;
+}
+.bd-fold-total .unit {
+  font-size: var(--fs-xs);
+  color: var(--ink-3);
+  margin-left: 2px;
+}
+.bd-fold[open] .disclosure-icon {
+  transform: rotate(180deg);
+}
+.bd-fold-body {
+  padding: 0 10px 12px;
+}
+.bd-bare {
+  padding: 0;
+  background: none;
+  box-shadow: none;
+}
+.bd-bare .bd-head {
+  align-items: center;
+  padding: 0 4px 8px;
+}
+
+/* お金の目標の貯め方（答え） */
+.plan-answer {
+  display: grid;
+  gap: 12px;
+  padding: 16px;
+  border-radius: var(--radius-m);
+  background: var(--accent-wash);
+}
+.plan-answer-label {
+  font-size: var(--fs-s);
+  font-weight: 700;
+  color: var(--ink-2);
+}
+.plan-answer-row {
+  display: flex;
+  align-items: flex-end;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+}
+.plan-answer-cell {
+  display: grid;
+}
+.plan-answer-cap {
+  font-size: var(--fs-xs);
+  color: var(--ink-3);
+  font-weight: 600;
+}
+.plan-answer-num {
+  font-size: 26px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  line-height: 1.2;
+}
+.plan-answer-plus {
+  font-size: 22px;
+  color: var(--ink-3);
+  padding-bottom: 2px;
+}
+.plan-answer-ok {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--fs-s);
+  color: var(--good-text);
+}
+.bonus-when-list {
+  display: grid;
+  gap: 6px;
+  font-size: var(--fs-s);
+}
+.bonus-when-list li {
+  display: grid;
+  gap: 1px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--surface) 70%, transparent);
+}
+.split-note {
+  font-size: var(--fs-xs);
+  color: var(--ink-3);
+}

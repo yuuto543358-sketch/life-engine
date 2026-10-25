@@ -153,8 +153,18 @@ export interface AutoSavingsTarget {
   fromBonus: number;
   /** ボーナスのうち貯金に回す割合（%） */
   bonusRate: number;
+  /** ボーナスごとの使いみち（早い順）。そのボーナスから目標に回す合計と、目標ごとの額 */
+  bonusPlan: BonusPlanRow[];
   /** 対象の目標 */
   goals: { goal: Goal; plan: GoalPlan; need: MoneyGoalNeed }[];
+}
+
+export interface BonusPlanRow {
+  month: string;
+  label: string;
+  /** このボーナスから目標に回す合計（円） */
+  amount: number;
+  goals: { goalId: string; name: string; amount: number }[];
 }
 
 /** 貯金の目標額を、お金の目標から自動で計算する */
@@ -175,8 +185,23 @@ export function calculateAutoSavingsTarget(scenario: Scenario, goals: Goal[], to
     monthlyNeed: active.reduce((s, x) => s + (x.need.monthlyNeed ?? 0), 0),
     fromBonus: active.reduce((s, x) => s + x.need.fromBonus, 0),
     bonusRate: bonusSavingsRate(scenario.finance),
+    bonusPlan: bonusPlanOf(active),
     goals: list,
   };
+}
+
+function bonusPlanOf(list: { goal: Goal; need: MoneyGoalNeed }[]): BonusPlanRow[] {
+  const rows = new Map<string, BonusPlanRow>();
+  for (const { goal, need } of list) {
+    for (const u of need.bonusUses) {
+      const key = `${u.month}|${u.label}`;
+      const row = rows.get(key) ?? { month: u.month, label: u.label, amount: 0, goals: [] };
+      row.amount += u.amount;
+      row.goals.push({ goalId: goal.id, name: goal.name, amount: u.amount });
+      rows.set(key, row);
+    }
+  }
+  return [...rows.values()].sort((a, b) => a.month.localeCompare(b.month) || a.label.localeCompare(b.label));
 }
 
 /** 貯金目標の決め方。未設定の古いデータは、目標額が入っていれば手動、なければ自動 */
