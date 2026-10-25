@@ -1,6 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { toDateString } from '../engine/units';
-import { cloneScenario } from '../engine/scenarios';
+import { cloneScenario, structuredCloneSafe } from '../engine/scenarios';
 import { loadAll, replaceAll, requestPersistence, write, StorageError, type StoreName, type WriteOp } from './db';
 import { defaultDomains, defaultProfile, defaultSettings, emptyScenario } from './defaults';
 import { buildSample } from './sample';
@@ -328,8 +328,8 @@ export function StoreProvider({ children, fallback }: { children: ReactNode; fal
           if (s.id !== CURRENT_SCENARIO_ID) return s;
           return {
             ...s,
-            ...(seed ? { time: structuredClone(sample.time), finance: structuredClone(sample.finance) } : {}),
-            goalPlans: { ...s.goalPlans, ...structuredClone(sample.goalPlans) },
+            ...(seed ? { time: structuredCloneSafe(sample.time), finance: structuredCloneSafe(sample.finance) } : {}),
+            goalPlans: { ...s.goalPlans, ...structuredCloneSafe(sample.goalPlans) },
             updatedAt: now,
           };
         });

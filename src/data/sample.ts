@@ -1,4 +1,5 @@
 import { addDays, addMonths } from '../engine/units';
+import { structuredCloneSafe } from '../engine/scenarios';
 import { emptyScenario } from './defaults';
 import {
   CURRENT_SCENARIO_ID,
@@ -150,9 +151,9 @@ export function buildSample(today: string, now: string): SampleBundle {
       id,
       name,
       note,
-      time: structuredClone(time),
-      finance: structuredClone(finance),
-      goalPlans: structuredClone(goalPlans),
+      time: structuredCloneSafe(time),
+      finance: structuredCloneSafe(finance),
+      goalPlans: structuredCloneSafe(goalPlans),
       sourceId: CURRENT_SCENARIO_ID,
       isSample: true,
     };
